@@ -1,0 +1,32 @@
+# 输入表
+## 1.1 加工计划表（sheet name: "01排产信息（输入）"）
+线体	任务令		原材料编码	计划量	休息时间	开工时间			完工时间
+line1	mfg_order1	item1		120		2.833		2026-06-10 00:39:25	2026-06-10 11:30:01
+
+## 1.2 拆分结果表（sheet name: "02输入（SR拆分）"）
+物料编码	供应商名称	货位	需求数量	需求ID
+item1		supplier1	loc1	60          demand1
+item1		supplier1	loc1	60          demand2
+
+* 保证拆分后的需求数量汇总后与加工计划所需相同
+
+## 1.3 包规基表（sheet name: "03包规基表"）
+编码	包规
+item1	5
+
+## 1.4 车规表（sheet name: "04供应商作息&车规基表"）
+供应商名称	车规（板/车）
+supplier1    18
+supplier2    22
+supplier3    18
+
+
+
+# 输出表
+供应商		车次	物料编码	任务令	线体	货位	需求ID	满足数量	包规	板数	总板数	车规	装载率	计划到货时间
+supplier1	车次1	item1		mfg1	line1	loc1	dem1	108			18		6		14		18		77.8%	2025-10-21 16:00:00
+					item2		mfg2	line2	loc2	dem2	38			5		8					
+			车次2	item3		mfg3	line3	loc3	dem3	108			18		6		17		18		94.4%	2025-10-21 19:00:00
+					item2		mfg2	line3	loc2	dem4	52			5		11					
+			车次3	item4		mfg4	line4	loc4	dem5	7			22		1		3		18		16.7%	2025-10-22 03:00:00
+					item5		mfg5	line5	loc5	dem6	12			6		2					
