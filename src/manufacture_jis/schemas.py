@@ -18,6 +18,19 @@ class ManufacturingPlan:
 
 
 @dataclass(frozen=True)
+class ScheduleInputData:
+    plans: list[ManufacturingPlan]
+    split_demands: list[SplitDemand]
+    pack_rules: list[PackRule]
+    truck_rules: list[TruckRule]
+
+
+@dataclass(frozen=True)
+class ScheduleOutputData:
+    rows: list[ScheduleRow]
+
+
+@dataclass(frozen=True)
 class SplitDemand:
     item_code: str
     supplier: str
