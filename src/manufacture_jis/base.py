@@ -1,0 +1,21 @@
+from dataclasses import dataclass
+
+
+@dataclass
+class HourlyConcumption:
+    """一条任务令的小时级消耗。假设这条消耗只在一辆车上，这是符合业务认知的。"""
+    cid: str  # 这条消耗的id
+    mfg_order: str  # 任务令
+    consumption_time: int  # 开始消耗的时间点
+    item: str  # 物料编码
+    qty: int  # 消耗数量
+    arrival_lb: int  # 最早到达时间
+    arrival_ub: int  # 最晚到达时间
+
+
+@dataclass
+class Vehicle:
+    """车辆"""
+    supplier: str  # 供应商
+    v: str  # 车辆id
+    capacity: int  # 车规：可以装载的最大板数
