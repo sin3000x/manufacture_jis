@@ -197,7 +197,7 @@ class JISData:
                 cid = f"{s_row.mfg_order}_h{h}"
                 hourly_qty = base_qty + (1 if k < remainder else 0)
                 arrival_lb = h - self.arrival_lead_time
-                arrival_ub = (h + 1) - self.arrival_lag_time
+                arrival_ub = h - self.arrival_lag_time
 
                 self.c2consumption[cid] = HourlyConcumption(
                     cid=cid,

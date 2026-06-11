@@ -13,8 +13,8 @@ def test_jis_data_can_load_sample_input() -> None:
 
     # origin = midnight of earliest start time - 1 day
     # start_hour=24, finish_hour=36, processing_time=10, h ranges 24..33
-    # arrival_ub = h+1-3 = h-2, max at h=33 → 31
-    assert data.t_max == 31
+    # arrival_ub = h-3, max at h=33 → 30
+    assert data.t_max == 30
 
     # packaging
     assert data.pc_per_pallet == {"item1": 10}
@@ -57,11 +57,11 @@ def test_jis_data_can_load_sample_input() -> None:
     assert c.qty == 10
     assert c.consumption_time == 24
     assert c.arrival_lb == 16  # 24 - 8
-    assert c.arrival_ub == 22  # (24+1) - 3
+    assert c.arrival_ub == 21  # 24 - 3
 
     # spot-check last hour
     c_last = data.c2consumption["mfg_order1_h33"]
     assert c_last.qty == 10
     assert c_last.consumption_time == 33
     assert c_last.arrival_lb == 25  # 33 - 8
-    assert c_last.arrival_ub == 31  # (33+1) - 3
+    assert c_last.arrival_ub == 30  # 33 - 3
