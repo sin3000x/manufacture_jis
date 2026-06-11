@@ -13,7 +13,7 @@ def test_jis_data_can_load_sample_input() -> None:
     assert data.t_max == 25
 
     # packaging
-    assert data.pc_per_pallet == {"item1": 10}
+    assert data.pc_per_pallet == {"item1": 30}
 
     # s_to_i_set / i_to_s_set / i_to_v_set
     assert data.s_to_i_set["supplier1"] == {"item1"}
