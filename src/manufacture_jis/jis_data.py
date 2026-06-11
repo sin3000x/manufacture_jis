@@ -12,6 +12,7 @@ from manufacture_jis.base import HourlyConcumption, Vehicle
 SCHEDULE_COL_MAP = {
     "任务令": "mfg_order",
     "原材料编码": "item_code",
+    "计划量": "planned_qty",
     "开工时间": "start_time",
     "完工时间": "finish_time",
     "休息时间": "rest_time",
@@ -100,7 +101,7 @@ class JISData:
         self._load_suppliers()
         schedule_df = self._load_schedule()
         demand_df = self._load_demands()
-        self._merge_and_build(schedule_df, demand_df)
+        self._build_consumptions(schedule_df, demand_df)
 
     def _load_packaging(self) -> None:
         df = _read_sheet(self.path, self.PACKING_SHEET, PACKING_COL_MAP)
@@ -132,6 +133,7 @@ class JISData:
             raise ValueError("排产信息为空")
         df["item_code"] = df["item_code"].astype(str).str.strip()
         df["mfg_order"] = df["mfg_order"].astype(str).str.strip()
+        df["planned_qty"] = pd.to_numeric(df["planned_qty"], errors="raise").astype(int)
         df["start_time"] = pd.to_datetime(df["start_time"])
         df["finish_time"] = pd.to_datetime(df["finish_time"])
         df["rest_time"] = pd.to_numeric(df["rest_time"], errors="raise")
@@ -147,33 +149,25 @@ class JISData:
         df["qty"] = pd.to_numeric(df["qty"], errors="raise").astype(int)
         return df
 
-    def _merge_and_build(
+    def _build_consumptions(
         self, schedule_df: pd.DataFrame, demand_df: pd.DataFrame
     ) -> None:
         if demand_df.empty:
             return
 
-        missing_schedule = set(demand_df["item_code"]) - set(
-            schedule_df["item_code"]
-        )
+        missing_schedule = set(demand_df["item_code"]) - set(schedule_df["item_code"])
         if missing_schedule:
-            raise ValueError(
-                f"物料 {sorted(missing_schedule)[0]} 在排产信息中不存在"
-            )
+            raise ValueError(f"物料 {sorted(missing_schedule)[0]} 在排产信息中不存在")
 
         missing_packaging = set(demand_df["item_code"]) - set(self.pc_per_pallet)
         if missing_packaging:
-            raise ValueError(
-                f"物料 {sorted(missing_packaging)[0]} 缺少包规"
-            )
+            raise ValueError(f"物料 {sorted(missing_packaging)[0]} 缺少包规")
 
         missing_supplier = set(demand_df["supplier"]) - set(self.s_to_v_set)
         if missing_supplier:
-            raise ValueError(
-                f"供应商 {sorted(missing_supplier)[0]} 缺少车规"
-            )
+            raise ValueError(f"供应商 {sorted(missing_supplier)[0]} 缺少车规")
 
-        # 提前记录 supplier ↔ item 的静态关联
+        # 从需求构建 supplier ↔ item 的静态关联
         for d_row in demand_df.itertuples(index=False):
             vehicles = self.s_to_v_set[d_row.supplier]
             self.s_to_i_set[d_row.supplier].add(d_row.item_code)
@@ -190,44 +184,29 @@ class JISData:
             (schedule_df["finish_time"] - origin).dt.total_seconds() // 3600
         ).astype(int)
 
-        # 把排产按小时展开，每个加工小时一行
-        schedule_rows: list[dict] = []
+        # 按排产展开为小时级消耗，每个小时一条
         for s_row in schedule_df.itertuples(index=False):
             processing_time: int = math.ceil(
                 s_row.finish_hour - s_row.start_hour - s_row.rest_time
             )
+            base_qty: int = s_row.planned_qty // processing_time
+            remainder: int = s_row.planned_qty % processing_time
+
             for k in range(processing_time):
                 h = s_row.start_hour + k
-                schedule_rows.append(
-                    {
-                        "item_code": s_row.item_code,
-                        "mfg_order": s_row.mfg_order,
-                        "hour": h,
-                        "hour_index": k,
-                        "processing_time": processing_time,
-                    }
+                cid = f"{s_row.mfg_order}_h{h}"
+                hourly_qty = base_qty + (1 if k < remainder else 0)
+                arrival_lb = h - self.arrival_lead_time
+                arrival_ub = (h + 1) - self.arrival_lag_time
+
+                self.c2consumption[cid] = HourlyConcumption(
+                    cid=cid,
+                    mfg_order=s_row.mfg_order,
+                    consumption_time=h,
+                    item=s_row.item_code,
+                    qty=hourly_qty,
+                    arrival_lb=arrival_lb,
+                    arrival_ub=arrival_ub,
                 )
-        schedule_hourly = pd.DataFrame(schedule_rows)
-
-        # 需求关联到每个加工小时：同一物料同一小时，所有供应商都需要供货
-        merged = schedule_hourly.merge(demand_df, on="item_code", how="inner")
-
-        for row in merged.itertuples(index=False):
-            base_qty: int = row.qty // row.processing_time
-            remainder: int = row.qty % row.processing_time
-            hourly_qty = base_qty + (1 if row.hour_index < remainder else 0)
-            arrival_lb = row.hour - self.arrival_lead_time
-            arrival_ub = (row.hour + 1) - self.arrival_lag_time
-
-            cid = f"{row.demand_id}_h{row.hour}"
-            self.c2consumption[cid] = HourlyConcumption(
-                cid=cid,
-                mfg_order=row.mfg_order,
-                consumption_time=row.hour,
-                item=row.item_code,
-                qty=hourly_qty,
-                arrival_lb=arrival_lb,
-                arrival_ub=arrival_ub,
-            )
-            self.c_to_v_set[cid].update(self.s_to_v_set[row.supplier])
-            self.t_max = max(self.t_max, arrival_ub)
+                self.c_to_v_set[cid].update(self.i_to_v_set[s_row.item_code])
+                self.t_max = max(self.t_max, arrival_ub)

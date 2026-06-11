@@ -31,12 +31,6 @@ def test_jis_data_can_load_sample_input() -> None:
     assert len(data.s_to_v_set["supplier2"]) == 5
     assert len(data.s_to_v_set["supplier3"]) == 5
 
-    # c_to_v_set: each hourly consumption maps to 5 vehicles of its supplier
-    assert len(data.c_to_v_set["demand1_h24"]) == 5
-    assert all("supplier1" in v for v in data.c_to_v_set["demand1_h24"])
-    assert len(data.c_to_v_set["demand2_h24"]) == 5
-    assert all("supplier2" in v for v in data.c_to_v_set["demand2_h24"])
-
     # s_to_i_set / i_to_s_set / i_to_v_set
     assert data.s_to_i_set["supplier1"] == {"item1"}
     assert data.s_to_i_set["supplier2"] == {"item1"}
@@ -47,21 +41,27 @@ def test_jis_data_can_load_sample_input() -> None:
     assert data.si2qty[("supplier1", "item1")] == 50
     assert data.si2qty[("supplier2", "item1")] == 50
 
-    # hourly splitting: 10 hours per demand, 30 consumptions total
-    assert len(data.c2consumption) == 30
+    # 10 processing hours → 10 consumptions, each qty = total_demand / processing_time = 100/10 = 10
+    assert len(data.c2consumption) == 10
 
-    # spot-check demand1_h24 (first hour, h=24)
-    c = data.c2consumption["demand1_h24"]
+    # c_to_v_set: each consumption can be served by any vehicle of any supplier for this item
+    for h in range(24, 34):
+        cid = f"mfg_order1_h{h}"
+        assert cid in data.c2consumption
+        assert len(data.c_to_v_set[cid]) == 10  # supplier1×5 + supplier2×5
+
+    # spot-check first hour
+    c = data.c2consumption["mfg_order1_h24"]
     assert c.mfg_order == "mfg_order1"
     assert c.item == "item1"
-    assert c.qty == 5  # 50 // 10
+    assert c.qty == 10
     assert c.consumption_time == 24
     assert c.arrival_lb == 16  # 24 - 8
     assert c.arrival_ub == 22  # (24+1) - 3
 
-    # spot-check demand1_h33 (last hour, h=33)
-    c9 = data.c2consumption["demand1_h33"]
-    assert c9.qty == 5
-    assert c9.consumption_time == 33
-    assert c9.arrival_lb == 25  # 33 - 8
-    assert c9.arrival_ub == 31  # (33+1) - 3
+    # spot-check last hour
+    c_last = data.c2consumption["mfg_order1_h33"]
+    assert c_last.qty == 10
+    assert c_last.consumption_time == 33
+    assert c_last.arrival_lb == 25  # 33 - 8
+    assert c_last.arrival_ub == 31  # (33+1) - 3
