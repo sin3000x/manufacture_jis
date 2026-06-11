@@ -96,6 +96,9 @@ class JISData:
 
         self._load()
 
+    def __repr__(self) -> str:
+        return f"JISData({self.path})"
+
     def _load(self) -> None:
         self._load_packaging()
         self._load_suppliers()

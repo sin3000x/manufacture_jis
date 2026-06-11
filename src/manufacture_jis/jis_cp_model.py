@@ -48,6 +48,13 @@ class JISCPModel:
             v: self.solver.value(self.arrival[v])
             for v in self.use_vehicle_sol_set
         }
+        self.loaded_pallets_sol_df: pd.DataFrame = pd.DataFrame(
+            [
+                (v, i, self.solver.value(loaded_pallets))
+                for (v, i), loaded_pallets in self.loaded_pallets.items()
+            ],
+            columns=["v", "i", "loaded_pallets"],
+        )
 
     def _add_variables(self):
         data = self.data
@@ -81,6 +88,8 @@ class JISCPModel:
         self._constraint_use_vehicle()
         self._constraint_loaded_pallets()
         self._constraint_vehicle_capacity()
+        self._constraint_supplier_item_qty()
+        self._break_symmetry()
 
     def _set_objective(self):
         """最小化启用车辆数量"""
