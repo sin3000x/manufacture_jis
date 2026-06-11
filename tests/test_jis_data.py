@@ -1,19 +1,15 @@
-from pathlib import Path
-
+from manufacture_jis import DATA_ROOT
 from manufacture_jis.jis_data import JISData
 
 
 def test_jis_data_can_load_sample_input() -> None:
-    sample_path = Path(__file__).resolve().parents[1] / "data" / "sample_input.xlsx"
+    sample_path = DATA_ROOT / "sample_input.xlsx"
 
     data = JISData(sample_path)
 
     # item_set
     assert data.item_set == {"item1"}
 
-    # origin = midnight of earliest start time - 1 day
-    # start_hour=24, finish_hour=36, processing_time=10, h ranges 24..33
-    # arrival_ub = h-3, max at h=33 → 30
     assert data.t_max == 25
 
     # packaging

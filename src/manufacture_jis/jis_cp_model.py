@@ -14,6 +14,7 @@ class JISCPModel:
     def run(self):
         self.build()
         self.solve()
+        self.extract_solution()
 
     def build(self):
         self._add_variables()
