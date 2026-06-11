@@ -45,8 +45,7 @@ class JISCPModel:
             if self.solver.boolean_value(use_vehicle)
         )
         self.arrival_sol_dict: dict[str, int] = {
-            v: self.solver.value(self.arrival[v])
-            for v in self.use_vehicle_sol_set
+            v: self.solver.value(self.arrival[v]) for v in self.use_vehicle_sol_set
         }
         self.loaded_pallets_sol_df: pd.DataFrame = pd.DataFrame(
             [
@@ -106,6 +105,13 @@ class JISCPModel:
         for (c, v), assign in self.assign.items():
             self.model.add_implication(assign, self.use_vehicle[v])
 
+        # 如果一辆车被启用，那么它必须被分配
+        for v, use_vehicle in self.use_vehicle.items():
+            self.model.add(
+                use_vehicle
+                <= sum(assign for (c, vv), assign in self.assign.items() if vv == v)
+            )
+
     def _constraint_arrival(self):
         """每辆车到达时间区间约束"""
         data = self.data
@@ -154,6 +160,6 @@ class JISCPModel:
             for v1, v2 in zip(sorted_v, sorted_v[1:]):
                 self.model.add_implication(self.use_vehicle[v2], self.use_vehicle[v1])
                 self.model.add(self.arrival[v1] <= self.arrival[v2])
-        
+
         for v, arrival in self.arrival.items():
             self.model.add(arrival == 0).only_enforce_if(~self.use_vehicle[v])
