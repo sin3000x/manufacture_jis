@@ -83,7 +83,7 @@ class JISCPModel:
 
     def _set_objective(self):
         """最小化启用车辆数量"""
-        self.model.minimize(self.model.sum(self.use_vehicle.values()))
+        self.model.minimize(sum(self.use_vehicle.values()))
 
     def _constraint_exactly_one_assign(self):
         """每条消耗只能被一辆车送"""
@@ -112,7 +112,7 @@ class JISCPModel:
             i_qty = sum(
                 self.assign[(c, v)] * consumption.qty
                 for c, consumption in self.data.c2consumption.items()
-                if consumption.item == i
+                if consumption.item == i and v in self.data.c_to_v_set[c]
             )
             pc_per_pallet: int = self.data.pc_per_pallet[i]
 
