@@ -231,10 +231,10 @@ class JISData:
             base_qty: int = s_row.planned_qty // processing_time
             remainder: int = s_row.planned_qty % processing_time
 
-            for k in range(processing_time):
+            for k in range(processing_time + (1 if remainder > 0 else 0)):
                 h = s_row.start_hour + k
                 cid = f"{s_row.mfg_order}_h{h}"
-                hourly_qty = base_qty if k < processing_time - 1 else remainder
+                hourly_qty = base_qty if k < processing_time else remainder
                 arrival_lb = h - self.arrival_lead_time
                 arrival_ub = h - self.arrival_lag_time
 
