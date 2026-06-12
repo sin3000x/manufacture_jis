@@ -10,6 +10,7 @@ import pandas as pd
 from manufacture_jis.base import HourlyConcumption, Vehicle
 
 SCHEDULE_COL_MAP = {
+    "线体": "line",
     "任务令": "mfg_order",
     "原材料编码": "item_code",
     "计划量": "planned_qty",
@@ -23,6 +24,7 @@ DEMAND_COL_MAP = {
     "物料编码": "item_code",
     "供应商名称": "supplier",
     "需求数量": "qty",
+    "货位": "location",
 }
 
 PACKING_COL_MAP = {
@@ -107,6 +109,12 @@ class JISData:
         self.si2qty: dict[tuple[str, str], int] = defaultdict(int)
         # 时间轴原点：最早开工日当天 0 点再减 1 天
         self.origin: pd.Timestamp | None = None
+
+        # 任务令 -> 线体
+        self.mfg_order_to_line: dict[str, str] = {}
+        # 物料编码 -> 货位
+        self.item_to_location: dict[str, str] = {}
+
         self._sheet_map: dict[str, str] = _build_sheet_name_map(path)
 
         self._load()
@@ -136,9 +144,14 @@ class JISData:
     def _load(self) -> None:
         self._load_packaging()
         self._load_suppliers()
+
         schedule_df = self._load_schedule()
         self.origin = schedule_df["start_time"].min().normalize() - pd.Timedelta(days=1)
+        self.mfg_order_to_line = schedule_df.set_index("mfg_order")["line"].to_dict()
+
         demand_df = self._load_demands()
+        self.item_to_location = demand_df.set_index("item_code")["location"].to_dict()
+
         self._build_consumptions(schedule_df, demand_df)
 
     def _load_packaging(self) -> None:
