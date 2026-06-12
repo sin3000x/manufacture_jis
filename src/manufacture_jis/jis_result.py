@@ -22,6 +22,7 @@ class JISResult:
             capacity=("capacity", "first"),
             arrival=("arrival", "first"),
         )
+
         df["到达时间"] = hour_to_datetime(df["arrival"], self.data.origin).dt.strftime(
             "%Y-%m-%d %H:%M:%S"
         )
@@ -40,6 +41,20 @@ class JISResult:
                 "capacity": "车规",
             },
         )
+
+        # 删除一些同维度下的重复值
+        df["s_group"] = df.groupby("供应商").ngroup()
+        df["sv_group"] = df.groupby(["供应商", "车次"]).ngroup()
+        df["svi_group"] = df.groupby(["供应商", "车次", "物料编码"]).ngroup()
+        merge_dict = {
+            "s_group": ["供应商"],
+            "sv_group": ["车次", "总装载板数", "车规", "装载率", "到达时间"],
+            "svi_group": ["物料编码", "包规", "装载板数"],
+        }
+        for merge_by, to_merge in merge_dict.items():
+            mask = df.duplicated(subset=merge_by, keep="first")
+            df.loc[mask, to_merge] = None
+
         return df
 
     def _build_result_df(self) -> pd.DataFrame:
