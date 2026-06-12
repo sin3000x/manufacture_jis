@@ -1,5 +1,6 @@
 from collections import defaultdict
 import math
+import re
 from ortools.sat.python import cp_model
 
 from manufacture_jis.base import Vehicle
@@ -160,8 +161,17 @@ class JISCPModel:
 
     def _break_symmetry(self):
         """打破对称性"""
-        for s, v_set in self.data.s_to_v_set.items():
-            sorted_v = sorted(v_set)
+
+        def vehicle_sort_key(v: str):
+            # 按“文本前缀 + 数字后缀”做自然排序，避免车次10排在车次2前面
+            match = re.match(r"^(.*?)(\d+)$", v)
+            if match:
+                prefix, number = match.groups()
+                return (prefix, int(number))
+            return (v, -1)
+
+        for _, v_set in self.data.s_to_v_set.items():
+            sorted_v = sorted(v_set, key=vehicle_sort_key)
             for v1, v2 in zip(sorted_v, sorted_v[1:]):
                 self.model.add_implication(self.use_vehicle[v2], self.use_vehicle[v1])
                 self.model.add(self.arrival[v1] <= self.arrival[v2])
