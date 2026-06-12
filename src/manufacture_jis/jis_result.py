@@ -12,28 +12,32 @@ class JISResult:
 
     def _build_output_df(self) -> pd.DataFrame:
         df: pd.DataFrame = self.result_df.groupby(
-            by=['supplier', 'v', 'item', 'mfg_order'],
+            by=["supplier", "v", "item", "mfg_order"],
             as_index=False,
         ).agg(
-            qty=('qty', 'sum'),
-            loaded_pallets=('loaded_pallets', 'sum'),
-            total_loaded_pallets=('total_loaded_pallets', 'first'),
-            capacity=('capacity', 'first'),
-            arrival=('arrival', 'first'),
+            qty=("qty", "sum"),
+            pc_per_pallet=("pc_per_pallet", "first"),
+            loaded_pallets=("loaded_pallets", "sum"),
+            total_loaded_pallets=("total_loaded_pallets", "first"),
+            capacity=("capacity", "first"),
+            arrival=("arrival", "first"),
         )
-        df["arrival"] = hour_to_datetime(df["arrival"], self.data.origin)
+        df["到达时间"] = hour_to_datetime(df["arrival"], self.data.origin).dt.strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
         df["装载率"] = df["total_loaded_pallets"] / df["capacity"]
+        df["装载率"] = df["装载率"].apply(lambda x: f"{x:.2%}")
         df = df.rename(
             columns={
-                'supplier': '供应商',
-                'v': '车次',
-                'mfg_order': '任务令',
-                'item': '物料编码',
-                'qty': '满足量',
-                'loaded_pallets': '装载板数',
-                'total_loaded_pallets': '总装载板数',
-                'capacity': '车规',
-                'arrival': '到达时间',
+                "supplier": "供应商",
+                "v": "车次",
+                "mfg_order": "任务令",
+                "item": "物料编码",
+                "qty": "满足量",
+                "pc_per_pallet": "包规",
+                "loaded_pallets": "装载板数",
+                "total_loaded_pallets": "总装载板数",
+                "capacity": "车规",
             },
         )
         return df
@@ -75,6 +79,6 @@ class JISResult:
                 "arrival",
             ],
         )
-        df['pc_per_pallet'] = df['item'].map(self.data.pc_per_pallet)
-        df = df.sort_values(by=['supplier', 'v', 'item', 'cid'])
+        df["pc_per_pallet"] = df["item"].map(self.data.pc_per_pallet)
+        df = df.sort_values(by=["supplier", "v", "item", "cid"])
         return df
