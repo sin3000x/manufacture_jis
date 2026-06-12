@@ -6,6 +6,6 @@ from manufacture_jis import DATA_ROOT
 def test_model():
     data = JISData(DATA_ROOT / "sample_input.xlsx")
     model = JISCPModel(data)
-    model.run()
+    result = model.run()
     print()
     

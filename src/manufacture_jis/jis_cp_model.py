@@ -1,7 +1,8 @@
-import pandas as pd
+from collections import defaultdict
 import math
 from ortools.sat.python import cp_model
 
+from manufacture_jis.base import Vehicle
 from manufacture_jis.jis_data import JISData
 from manufacture_jis.jis_result import JISResult
 
@@ -12,10 +13,10 @@ class JISCPModel:
         self.model = cp_model.CpModel()
         self.solver = cp_model.CpSolver()
 
-    def run(self):
+    def run(self) -> JISResult:
         self.build()
         self.solve()
-        self.extract_solution()
+        return self.extract_solution()
 
     def build(self):
         self._add_variables()
@@ -32,29 +33,31 @@ class JISCPModel:
         return self.solver.response_stats()
 
     def extract_solution(self) -> JISResult:
-        self.assign_sol_df: pd.DataFrame = pd.DataFrame(
-            [
-                (c, v)
-                for (c, v), assign in self.assign.items()
-                if self.solver.boolean_value(assign)
-            ],
-            columns=["cid", "v"],
-        )
-        self.use_vehicle_sol_set: set[str] = set(
-            v
-            for v, use_vehicle in self.use_vehicle.items()
-            if self.solver.boolean_value(use_vehicle)
-        )
-        self.arrival_sol_dict: dict[str, int] = {
-            v: self.solver.value(self.arrival[v]) for v in self.data.v2vehicle
-        }
-        self.loaded_pallets_sol_df: pd.DataFrame = pd.DataFrame(
-            [
-                (v, i, self.solver.value(loaded_pallets))
-                for (v, i), loaded_pallets in self.loaded_pallets.items()
-            ],
-            columns=["v", "i", "loaded_pallets"],
-        )
+        data = self.data
+        solver = self.solver
+        assign_by_vehicle: dict[str, list[str]] = defaultdict(list)
+        items_by_vehicle: dict[str, set[str]] = defaultdict(set)
+        for (c, v), assign in self.assign.items():
+            if solver.boolean_value(assign):
+                assign_by_vehicle[v].append(c)
+                items_by_vehicle[v].add(data.c2consumption[c].item)
+
+        vehicles: list[Vehicle] = [
+            Vehicle(
+                supplier=data.v2vehicle[v].supplier,
+                v=v,
+                capacity=data.v2vehicle[v].capacity,
+                arrival=solver.value(self.arrival[v]),
+                loads=[data.c2consumption[c] for c in c_list],
+                item_to_loaded_pallets={
+                    i: solver.value(self.loaded_pallets[(v, i)])
+                    for i in data.item_set
+                    if solver.value(self.loaded_pallets[(v, i)]) > 0
+                },
+            )
+            for v, c_list in assign_by_vehicle.items()
+        ]
+        return JISResult(self.data, vehicles)
 
     def _add_variables(self):
         data = self.data
@@ -79,7 +82,7 @@ class JISCPModel:
                 0, data.v2vehicle[v].capacity, f"loaded_pallet_{v}"
             )
             for i in data.item_set
-            for v in self.use_vehicle_sol_set
+            for v in data.i_to_v_set[i]
         }
 
     def _add_constraints(self):

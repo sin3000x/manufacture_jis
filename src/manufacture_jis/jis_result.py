@@ -8,6 +8,30 @@ class JISResult:
         self.data = data
         self.vehicles = vehicles
         self.result_df: pd.DataFrame = self._build_result_df()
+        self.output_df: pd.DataFrame = self._build_output_df()
+
+    def _build_output_df(self) -> pd.DataFrame:
+        df: pd.DataFrame = self.result_df.groupby(
+            by=['supplier', 'v', 'mfg_order'],
+            as_index=False,
+        ).agg(
+            item=('item', 'first'),
+            qty=('qty', 'sum'),
+            loaded_pallets=('loaded_pallets', 'first'),
+            arrival=('arrival', 'first'),
+        )
+        df = df.rename(
+            columns={
+                'supplier': '供应商',
+                'v': '车次',
+                'mfg_order': '任务令',
+                'item': '物料编码',
+                'qty': '满足量',
+                'loaded_pallets': '装载板数',
+                'arrival': '到达时间',
+            },
+        )
+        return df
 
     def _build_result_df(self) -> pd.DataFrame:
         df: pd.DataFrame = pd.DataFrame(
@@ -43,4 +67,5 @@ class JISResult:
             ],
         )
         df['pc_per_pallet'] = df['item'].map(self.data.pc_per_pallet)
+        df = df.sort_values(by=['supplier', 'v', 'cid'])
         return df
