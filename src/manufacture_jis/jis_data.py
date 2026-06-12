@@ -46,8 +46,24 @@ def hour_to_datetime(hours: pd.Series, origin: pd.Timestamp) -> pd.Series:
     return origin + pd.to_timedelta(hours, unit="h")
 
 
-def _read_sheet(path, sheet_name: str, col_map: dict[str, str]) -> pd.DataFrame:
-    df = pd.read_excel(path, sheet_name=sheet_name)
+def _build_sheet_name_map(path) -> dict[str, str]:
+    """strip 后的名称 -> Excel 中的实际 sheet 名（兼容首尾空格）。"""
+    with pd.ExcelFile(path) as xl:
+        return {name.strip(): name for name in xl.sheet_names}
+
+
+def _read_sheet(
+    path,
+    sheet_name: str,
+    col_map: dict[str, str],
+    sheet_map: dict[str, str],
+) -> pd.DataFrame:
+    actual = sheet_map.get(sheet_name.strip())
+    if actual is None:
+        raise ValueError(
+            f"工作表 '{sheet_name}' 不存在，可用: {list(sheet_map)}"
+        )
+    df = pd.read_excel(path, sheet_name=actual)
     if df.empty:
         return df
     available = {k: v for k, v in col_map.items() if k in df.columns}
@@ -105,6 +121,7 @@ class JISData:
         self.si2qty: dict[tuple[str, str], int] = defaultdict(int)
         # 时间轴原点：最早开工日当天 0 点再减 1 天
         self.origin: pd.Timestamp | None = None
+        self._sheet_map: dict[str, str] = _build_sheet_name_map(path)
 
         self._load()
 
@@ -122,7 +139,7 @@ class JISData:
         self._build_consumptions(schedule_df, demand_df)
 
     def _load_packaging(self) -> None:
-        df = _read_sheet(self.path, self.PACKING_SHEET, PACKING_COL_MAP)
+        df = _read_sheet(self.path, self.PACKING_SHEET, PACKING_COL_MAP, self._sheet_map)
         if df.empty:
             return
         df["item_code"] = df["item_code"].astype(str).str.strip()
@@ -132,7 +149,7 @@ class JISData:
             self.item_set.add(row.item_code)
 
     def _load_suppliers(self) -> None:
-        df = _read_sheet(self.path, self.SUPPLIER_SHEET, SUPPLIER_COL_MAP)
+        df = _read_sheet(self.path, self.SUPPLIER_SHEET, SUPPLIER_COL_MAP, self._sheet_map)
         if df.empty:
             return
         df["supplier"] = df["supplier"].astype(str).str.strip()
@@ -146,7 +163,7 @@ class JISData:
                 self.s_to_v_set[row.supplier].add(vid)
 
     def _load_schedule(self) -> pd.DataFrame:
-        df = _read_sheet(self.path, self.SCHEDULE_SHEET, SCHEDULE_COL_MAP)
+        df = _read_sheet(self.path, self.SCHEDULE_SHEET, SCHEDULE_COL_MAP, self._sheet_map)
         if df.empty:
             raise ValueError("排产信息为空")
         df["item_code"] = df["item_code"].astype(str).str.strip()
@@ -158,7 +175,7 @@ class JISData:
         return df
 
     def _load_demands(self) -> pd.DataFrame:
-        df = _read_sheet(self.path, self.DEMAND_SHEET, DEMAND_COL_MAP)
+        df = _read_sheet(self.path, self.DEMAND_SHEET, DEMAND_COL_MAP, self._sheet_map)
         if df.empty:
             return df
         df["demand_id"] = df["demand_id"].astype(str).str.strip()
