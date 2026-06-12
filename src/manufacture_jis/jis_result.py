@@ -66,12 +66,16 @@ class JISResult:
         df["车次"] = df["车次"].str.split("_").str[-1]
 
         df["装载量"] = df["装载板数"] * df["包规"]
+        df["线体"] = df["任务令"].map(self.data.mfg_order_to_line)
+        df["货位"] = df["物料编码"].map(self.data.item_to_location)
         df = df[
             [
                 "供应商",
                 "车次",
                 "物料编码",
                 "任务令",
+                "线体",
+                "货位",
                 "任务令满足量",
                 "包规",
                 "装载板数",
