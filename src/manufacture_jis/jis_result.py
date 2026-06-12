@@ -12,8 +12,8 @@ class JISResult:
         self.result_df: pd.DataFrame = self._build_result_df()
         self.output_df: pd.DataFrame = self._build_output_df()
 
-    def write_excel(self, path: str | Path = '') -> None:
-        path = path or RESULT_ROOT / f'result_{self.data.path.stem}.xlsx'
+    def write_excel(self, path: str | Path = "") -> None:
+        path = path or RESULT_ROOT / f"result_{self.data.path.stem}.xlsx"
         self.output_df.to_excel(path, index=False)
 
     def _build_output_df(self) -> pd.DataFrame:
@@ -40,7 +40,7 @@ class JISResult:
                 "v": "车次",
                 "mfg_order": "任务令",
                 "item": "物料编码",
-                "qty": "满足量",
+                "qty": "任务令满足量",
                 "pc_per_pallet": "包规",
                 "loaded_pallets": "装载板数",
                 "total_loaded_pallets": "总装载板数",
@@ -61,7 +61,25 @@ class JISResult:
         for merge_by, to_merge in merge_dict.items():
             mask = df.duplicated(subset=merge_by, keep="first")
             df.loc[mask, to_merge] = None
+
+        # 删除车次编号中的供应商前缀
         df["车次"] = df["车次"].str.split("_").str[-1]
+
+        df["装载量"] = df["装载板数"] * df["包规"]
+        df = df[
+            [
+                "供应商",
+                "车次",
+                "物料编码",
+                "任务令",
+                "任务令满足量",
+                "装载量",
+                "总装载板数",
+                "车规",
+                "装载率",
+                "到达时间",
+            ]
+        ]
 
         return df
 
