@@ -51,8 +51,7 @@ class JISCPModel:
                 loads=[data.c2consumption[c] for c in c_list],
                 item_to_loaded_pallets={
                     i: solver.value(self.loaded_pallets[(v, i)])
-                    for i in data.item_set
-                    if solver.value(self.loaded_pallets[(v, i)]) > 0
+                    for i in items_by_vehicle[v]
                 },
             )
             for v, c_list in assign_by_vehicle.items()
