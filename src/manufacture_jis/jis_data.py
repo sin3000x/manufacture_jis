@@ -36,6 +36,16 @@ SUPPLIER_COL_MAP = {
 }
 
 
+def datetime_to_hour(dt: pd.Series, origin: pd.Timestamp) -> pd.Series:
+    """将 datetime Series 转为相对 origin 的小时偏移（整型）。"""
+    return ((dt - origin).dt.total_seconds() // 3600).astype(int)
+
+
+def hour_to_datetime(hours: pd.Series, origin: pd.Timestamp) -> pd.Series:
+    """将小时偏移 Series 转回 datetime。"""
+    return origin + pd.to_timedelta(hours, unit="h")
+
+
 def _read_sheet(path, sheet_name: str, col_map: dict[str, str]) -> pd.DataFrame:
     df = pd.read_excel(path, sheet_name=sheet_name)
     if df.empty:
@@ -93,6 +103,8 @@ class JISData:
         self.pc_per_pallet: dict[str, int] = {}
         # (供应商, 物料编码) -> 总数
         self.si2qty: dict[tuple[str, str], int] = defaultdict(int)
+        # 时间轴原点：最早开工日当天 0 点再减 1 天
+        self.origin: pd.Timestamp | None = None
 
         self._load()
 
@@ -103,6 +115,9 @@ class JISData:
         self._load_packaging()
         self._load_suppliers()
         schedule_df = self._load_schedule()
+        self.origin = (
+            schedule_df["start_time"].min().normalize() - pd.Timedelta(days=1)
+        )
         demand_df = self._load_demands()
         self._build_consumptions(schedule_df, demand_df)
 
@@ -179,13 +194,12 @@ class JISData:
             self.si2qty[(d_row.supplier, d_row.item_code)] += d_row.qty
             self.item_set.add(d_row.item_code)
 
-        origin = schedule_df["start_time"].min().normalize() - pd.Timedelta(days=1)
-        schedule_df["start_hour"] = (
-            (schedule_df["start_time"] - origin).dt.total_seconds() // 3600
-        ).astype(int)
-        schedule_df["finish_hour"] = (
-            (schedule_df["finish_time"] - origin).dt.total_seconds() // 3600
-        ).astype(int)
+        schedule_df["start_hour"] = datetime_to_hour(
+            schedule_df["start_time"], self.origin
+        )
+        schedule_df["finish_hour"] = datetime_to_hour(
+            schedule_df["finish_time"], self.origin
+        )
 
         # 按排产展开为小时级消耗，每个小时一条
         for s_row in schedule_df.itertuples(index=False):

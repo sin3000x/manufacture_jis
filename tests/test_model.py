@@ -7,5 +7,6 @@ def test_model():
     data = JISData(DATA_ROOT / "sample_input.xlsx")
     model = JISCPModel(data)
     result = model.run()
-    print()
+    vehicles = result.vehicles
+    assert len(vehicles) == 2
     

@@ -1,5 +1,5 @@
 import pandas as pd
-from manufacture_jis.jis_data import JISData
+from manufacture_jis.jis_data import JISData, hour_to_datetime
 from manufacture_jis.base import Vehicle
 
 
@@ -12,14 +12,17 @@ class JISResult:
 
     def _build_output_df(self) -> pd.DataFrame:
         df: pd.DataFrame = self.result_df.groupby(
-            by=['supplier', 'v', 'mfg_order'],
+            by=['supplier', 'v', 'item', 'mfg_order'],
             as_index=False,
         ).agg(
-            item=('item', 'first'),
             qty=('qty', 'sum'),
-            loaded_pallets=('loaded_pallets', 'first'),
+            loaded_pallets=('loaded_pallets', 'sum'),
+            total_loaded_pallets=('total_loaded_pallets', 'first'),
+            capacity=('capacity', 'first'),
             arrival=('arrival', 'first'),
         )
+        df["arrival"] = hour_to_datetime(df["arrival"], self.data.origin)
+        df["装载率"] = df["total_loaded_pallets"] / df["capacity"]
         df = df.rename(
             columns={
                 'supplier': '供应商',
@@ -28,6 +31,8 @@ class JISResult:
                 'item': '物料编码',
                 'qty': '满足量',
                 'loaded_pallets': '装载板数',
+                'total_loaded_pallets': '总装载板数',
+                'capacity': '车规',
                 'arrival': '到达时间',
             },
         )
@@ -45,6 +50,8 @@ class JISResult:
                     load.item,
                     load.qty,
                     vehicle.item_to_loaded_pallets[load.item],
+                    sum(vehicle.item_to_loaded_pallets.values()),
+                    vehicle.capacity,
                     load.arrival_lb,
                     load.arrival_ub,
                     vehicle.arrival,
@@ -61,11 +68,13 @@ class JISResult:
                 "item",
                 "qty",
                 "loaded_pallets",
+                "total_loaded_pallets",
+                "capacity",
                 "arrival_lb",
                 "arrival_ub",
                 "arrival",
             ],
         )
         df['pc_per_pallet'] = df['item'].map(self.data.pc_per_pallet)
-        df = df.sort_values(by=['supplier', 'v', 'cid'])
+        df = df.sort_values(by=['supplier', 'v', 'item', 'cid'])
         return df

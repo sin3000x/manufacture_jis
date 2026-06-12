@@ -7,6 +7,8 @@ def test_jis_data_can_load_sample_input() -> None:
 
     data = JISData(sample_path)
 
+    assert data.origin is not None
+
     # item_set
     assert data.item_set == {"item1"}
 
