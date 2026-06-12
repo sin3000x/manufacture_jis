@@ -3,6 +3,7 @@ import math
 from ortools.sat.python import cp_model
 
 from manufacture_jis.jis_data import JISData
+from manufacture_jis.jis_result import JISResult
 
 
 class JISCPModel:
@@ -30,14 +31,14 @@ class JISCPModel:
             raise RuntimeError(f"Solver status: {status}")
         return self.solver.response_stats()
 
-    def extract_solution(self):
+    def extract_solution(self) -> JISResult:
         self.assign_sol_df: pd.DataFrame = pd.DataFrame(
             [
                 (c, v)
                 for (c, v), assign in self.assign.items()
                 if self.solver.boolean_value(assign)
             ],
-            columns=["c", "v"],
+            columns=["cid", "v"],
         )
         self.use_vehicle_sol_set: set[str] = set(
             v
@@ -45,7 +46,7 @@ class JISCPModel:
             if self.solver.boolean_value(use_vehicle)
         )
         self.arrival_sol_dict: dict[str, int] = {
-            v: self.solver.value(self.arrival[v]) for v in self.use_vehicle_sol_set
+            v: self.solver.value(self.arrival[v]) for v in self.data.v2vehicle
         }
         self.loaded_pallets_sol_df: pd.DataFrame = pd.DataFrame(
             [
@@ -78,7 +79,7 @@ class JISCPModel:
                 0, data.v2vehicle[v].capacity, f"loaded_pallet_{v}"
             )
             for i in data.item_set
-            for v in data.i_to_v_set[i]
+            for v in self.use_vehicle_sol_set
         }
 
     def _add_constraints(self):
@@ -162,4 +163,6 @@ class JISCPModel:
                 self.model.add(self.arrival[v1] <= self.arrival[v2])
 
         for v, arrival in self.arrival.items():
-            self.model.add(arrival == 0).only_enforce_if(~self.use_vehicle[v])
+            self.model.add(arrival == self.data.t_max).only_enforce_if(
+                ~self.use_vehicle[v]
+            )

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -19,3 +19,10 @@ class Vehicle:
     supplier: str  # 供应商
     v: str  # 车辆id
     capacity: int  # 车规：可以装载的最大板数
+
+    # 装载的小时级消耗
+    loads: list[HourlyConcumption] = field(default_factory=list)
+    # 到达时间
+    arrival: int = 0
+    # 装载板数
+    item_to_loaded_pallets: dict[str, int] = field(default_factory=dict)
