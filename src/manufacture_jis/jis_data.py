@@ -36,16 +36,6 @@ SUPPLIER_COL_MAP = {
 }
 
 
-def datetime_to_hour(dt: pd.Series, origin: pd.Timestamp) -> pd.Series:
-    """将 datetime Series 转为相对 origin 的小时偏移（整型）。"""
-    return ((dt - origin).dt.total_seconds() // 3600).astype(int)
-
-
-def hour_to_datetime(hours: pd.Series, origin: pd.Timestamp) -> pd.Series:
-    """将小时偏移 Series 转回 datetime。"""
-    return origin + pd.to_timedelta(hours, unit="h")
-
-
 def _build_sheet_name_map(path) -> dict[str, str]:
     """strip 后的名称 -> Excel 中的实际 sheet 名（兼容首尾空格）。"""
     with pd.ExcelFile(path) as xl:
@@ -60,9 +50,7 @@ def _read_sheet(
 ) -> pd.DataFrame:
     actual = sheet_map.get(sheet_name.strip())
     if actual is None:
-        raise ValueError(
-            f"工作表 '{sheet_name}' 不存在，可用: {list(sheet_map)}"
-        )
+        raise ValueError(f"工作表 '{sheet_name}' 不存在，可用: {list(sheet_map)}")
     df = pd.read_excel(path, sheet_name=actual)
     if df.empty:
         return df
@@ -87,11 +75,13 @@ class JISData:
         num_vehicles_per_supplier: int = 5,
         arrival_lead_time: int = 8,
         arrival_lag_time: int = 3,
+        rest_times: list[int] | None = None,
     ):
         self.path = path
         self.num_vehicles_per_supplier = num_vehicles_per_supplier
         self.arrival_lead_time = arrival_lead_time
         self.arrival_lag_time = arrival_lag_time
+        self.rest_times = rest_times or [1, 2, 7, 12, 13, 18]
 
         # 消耗id -> 消耗
         self.c2consumption: dict[str, HourlyConcumption] = {}
@@ -121,21 +111,40 @@ class JISData:
 
         self._load()
 
+        self.arrival_domain: list[int] = list(
+            t for t in range(self.t_max + 1) if not self.is_rest_time(t)
+        )
+
     def __repr__(self) -> str:
         return f"JISData({self.path})"
+
+    def is_rest_time(self, hour: int) -> bool:
+        return (hour % 24) in self.rest_times
+
+    def datetime_to_hour(self, dt: pd.Series) -> pd.Series:
+        """将 datetime Series 转为相对 origin 的小时偏移（整型）。"""
+        if self.origin is None:
+            raise ValueError("origin 尚未初始化")
+        return ((dt - self.origin).dt.total_seconds() // 3600).astype(int)
+
+    def hour_to_datetime(self, hours: pd.Series) -> pd.Series:
+        """将小时偏移 Series 转回 datetime。"""
+        if self.origin is None:
+            raise ValueError("origin 尚未初始化")
+        return self.origin + pd.to_timedelta(hours, unit="h")
 
     def _load(self) -> None:
         self._load_packaging()
         self._load_suppliers()
         schedule_df = self._load_schedule()
-        self.origin = (
-            schedule_df["start_time"].min().normalize() - pd.Timedelta(days=1)
-        )
+        self.origin = schedule_df["start_time"].min().normalize() - pd.Timedelta(days=1)
         demand_df = self._load_demands()
         self._build_consumptions(schedule_df, demand_df)
 
     def _load_packaging(self) -> None:
-        df = _read_sheet(self.path, self.PACKING_SHEET, PACKING_COL_MAP, self._sheet_map)
+        df = _read_sheet(
+            self.path, self.PACKING_SHEET, PACKING_COL_MAP, self._sheet_map
+        )
         if df.empty:
             return
         df["item_code"] = df["item_code"].astype(str).str.strip()
@@ -145,7 +154,9 @@ class JISData:
             self.item_set.add(row.item_code)
 
     def _load_suppliers(self) -> None:
-        df = _read_sheet(self.path, self.SUPPLIER_SHEET, SUPPLIER_COL_MAP, self._sheet_map)
+        df = _read_sheet(
+            self.path, self.SUPPLIER_SHEET, SUPPLIER_COL_MAP, self._sheet_map
+        )
         if df.empty:
             return
         df["supplier"] = df["supplier"].astype(str).str.strip()
@@ -159,7 +170,9 @@ class JISData:
                 self.s_to_v_set[row.supplier].add(vid)
 
     def _load_schedule(self) -> pd.DataFrame:
-        df = _read_sheet(self.path, self.SCHEDULE_SHEET, SCHEDULE_COL_MAP, self._sheet_map)
+        df = _read_sheet(
+            self.path, self.SCHEDULE_SHEET, SCHEDULE_COL_MAP, self._sheet_map
+        )
         if df.empty:
             raise ValueError("排产信息为空")
         df["item_code"] = df["item_code"].astype(str).str.strip()
@@ -207,12 +220,8 @@ class JISData:
             self.si2qty[(d_row.supplier, d_row.item_code)] += d_row.qty
             self.item_set.add(d_row.item_code)
 
-        schedule_df["start_hour"] = datetime_to_hour(
-            schedule_df["start_time"], self.origin
-        )
-        schedule_df["finish_hour"] = datetime_to_hour(
-            schedule_df["finish_time"], self.origin
-        )
+        schedule_df["start_hour"] = self.datetime_to_hour(schedule_df["start_time"])
+        schedule_df["finish_hour"] = self.datetime_to_hour(schedule_df["finish_time"])
 
         # 按排产展开为小时级消耗，每个小时一条
         for s_row in schedule_df.itertuples(index=False):

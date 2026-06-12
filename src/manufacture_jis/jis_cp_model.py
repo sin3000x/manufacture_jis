@@ -26,7 +26,7 @@ class JISCPModel:
     def solve(self) -> str:
         self.solver.parameters.log_search_progress = True
         self.solver.parameters.max_time_in_seconds = 120
-        self.solver.parameters.num_search_workers = 8
+        self.solver.parameters.num_search_workers = 32
         status = self.solver.solve(self.model)
         if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
             raise RuntimeError(f"Solver status: {status}")
@@ -72,7 +72,9 @@ class JISCPModel:
         }
         # 车辆v到达时间
         self.arrival: dict[str, cp_model.IntVar] = {
-            v: self.model.new_int_var(0, data.t_max, f"arrival_{v}")
+            v: self.model.new_int_var_from_domain(
+                cp_model.Domain.from_values(data.arrival_domain), f"arrival_{v}"
+            )
             for v in data.v2vehicle
         }
         # 车辆v装载的物料i的板数
@@ -165,6 +167,6 @@ class JISCPModel:
                 self.model.add(self.arrival[v1] <= self.arrival[v2])
 
         for v, arrival in self.arrival.items():
-            self.model.add(arrival == self.data.t_max).only_enforce_if(
+            self.model.add(arrival == self.data.arrival_domain[-1]).only_enforce_if(
                 ~self.use_vehicle[v]
             )

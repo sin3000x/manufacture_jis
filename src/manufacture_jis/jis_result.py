@@ -1,5 +1,5 @@
 import pandas as pd
-from manufacture_jis.jis_data import JISData, hour_to_datetime
+from manufacture_jis.jis_data import JISData
 from manufacture_jis.base import Vehicle
 
 
@@ -23,7 +23,7 @@ class JISResult:
             arrival=("arrival", "first"),
         )
 
-        df["到达时间"] = hour_to_datetime(df["arrival"], self.data.origin).dt.strftime(
+        df["到达时间"] = self.data.hour_to_datetime(df["arrival"]).dt.strftime(
             "%Y-%m-%d %H:%M:%S"
         )
         df["装载率"] = df["total_loaded_pallets"] / df["capacity"]
