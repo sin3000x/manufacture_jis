@@ -234,7 +234,7 @@ class JISData:
             for k in range(processing_time):
                 h = s_row.start_hour + k
                 cid = f"{s_row.mfg_order}_h{h}"
-                hourly_qty = base_qty + (1 if k < remainder else 0)
+                hourly_qty = base_qty if k < processing_time - 1 else remainder
                 arrival_lb = h - self.arrival_lead_time
                 arrival_ub = h - self.arrival_lag_time
 
