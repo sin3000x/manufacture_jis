@@ -74,14 +74,10 @@ class JISData:
     """JIS 输入数据。
 
     当前版本支持从样例 Excel 中读取四张表：
-    1. `01排产信息（输入）`
-    2. `02输入（SR拆分）`
-    3. `03包规基表`
-    4. `04供应商作息&车规基表`
     """
 
-    SCHEDULE_SHEET = "01排产信息（输入）"
-    DEMAND_SHEET = "02输入（SR拆分）"
+    SCHEDULE_SHEET = "01排产信息 (输入)"
+    DEMAND_SHEET = "02输入 (SR拆分)"
     PACKING_SHEET = "03包规基表"
     SUPPLIER_SHEET = "04供应商作息&车规基表"
 
