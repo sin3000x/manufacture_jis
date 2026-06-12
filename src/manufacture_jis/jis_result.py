@@ -17,7 +17,7 @@ class JISResult:
         ).agg(
             qty=("qty", "sum"),
             pc_per_pallet=("pc_per_pallet", "first"),
-            loaded_pallets=("loaded_pallets", "sum"),
+            loaded_pallets=("loaded_pallets", "first"),
             total_loaded_pallets=("total_loaded_pallets", "first"),
             capacity=("capacity", "first"),
             arrival=("arrival", "first"),
@@ -54,6 +54,7 @@ class JISResult:
         for merge_by, to_merge in merge_dict.items():
             mask = df.duplicated(subset=merge_by, keep="first")
             df.loc[mask, to_merge] = None
+        df["车次"] = df["车次"].str.split("_").str[-1]
 
         return df
 
