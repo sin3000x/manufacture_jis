@@ -81,7 +81,7 @@ class JISData:
         self.num_vehicles_per_supplier = num_vehicles_per_supplier
         self.arrival_lead_time = arrival_lead_time
         self.arrival_lag_time = arrival_lag_time
-        self.rest_times = rest_times or [1, 2, 7, 12, 13, 18]
+        self.rest_times = rest_times or []
 
         # 消耗id -> 消耗
         self.c2consumption: dict[str, HourlyConcumption] = {}
