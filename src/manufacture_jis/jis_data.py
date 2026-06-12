@@ -77,7 +77,7 @@ class JISData:
         arrival_lag_time: int = 3,
         rest_times: list[int] | None = None,
     ):
-        self.path = path
+        self.path = Path(path)
         self.num_vehicles_per_supplier = num_vehicles_per_supplier
         self.arrival_lead_time = arrival_lead_time
         self.arrival_lag_time = arrival_lag_time
