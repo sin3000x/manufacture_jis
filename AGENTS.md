@@ -6,9 +6,10 @@ manufacture-jis 是一个 JIS（Just-In-Sequence）物料配送优化系统。�
 
 ## 技术栈
 
-- Python 3.11，`uv` 管理依赖，`pytest` 测试
+- Python 3.11，`uv` 管理依赖和运行命令，`pytest` 测试
 - 包布局：`src/manufacture_jis/`，`pyproject.toml` 含 `pythonpath = ["src"]`
 - pandas + openpyxl 读 Excel，OR-Tools CP-SAT 求解
+- 启动脚本：`PYTHONPATH=src uv run uvicorn manufacture_jis.web.app:app --host 0.0.0.0 --port 8080`
 
 ## 核心概念
 

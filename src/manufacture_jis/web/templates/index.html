@@ -28,8 +28,8 @@
 
         <div class="form-group">
           <label for="arrival_lead_time">
-            到达提前期（小时）
-            <span class="desc">物料最早可在消耗时间前多少小时到达。数值越大，到达时间窗口越宽，优化空间越大。</span>
+            最早到达提前期（小时）
+            <span class="desc">物料最早可在消耗时间前多少小时到达。</span>
           </label>
           <input type="number" id="arrival_lead_time" name="arrival_lead_time"
                  value="{{ default_lead_time }}" min="1" required>
@@ -37,8 +37,8 @@
 
         <div class="form-group">
           <label for="arrival_lag_time">
-            到达滞后期（小时）
-            <span class="desc">物料最晚可在消耗时间前多少小时到达。数值越大，到达时间窗口越宽，但物料不能晚于此时间到达。</span>
+            最晚到达提前期（小时）
+            <span class="desc">物料最晚可在消耗时间前多少小时到达。</span>
           </label>
           <input type="number" id="arrival_lag_time" name="arrival_lag_time"
                  value="{{ default_lag_time }}" min="1" required>
