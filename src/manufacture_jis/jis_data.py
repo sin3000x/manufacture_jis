@@ -5,6 +5,7 @@ from collections import defaultdict
 import math
 from pathlib import Path
 
+from loguru import logger
 import pandas as pd
 
 from manufacture_jis.base import HourlyConcumption, Vehicle
@@ -74,7 +75,7 @@ class JISData:
     def __init__(
         self,
         path: str | Path | io.BytesIO,
-        num_vehicles_per_supplier: int = 5,
+        num_vehicles_per_supplier: int | None = None,
         arrival_lead_time: int = 8,
         arrival_lag_time: int = 3,
         rest_times: list[int] | None = None,
@@ -143,7 +144,7 @@ class JISData:
 
     def _load(self) -> None:
         self._load_packaging()
-        self._load_suppliers()
+        supplier_info = self._read_supplier_info()
 
         schedule_df = self._load_schedule()
         self.origin = schedule_df["start_time"].min().normalize() - pd.Timedelta(days=1)
@@ -152,7 +153,33 @@ class JISData:
         demand_df = self._load_demands()
         self.item_to_location = demand_df.set_index("item_code")["location"].to_dict()
 
-        self._build_consumptions(schedule_df, demand_df)
+        if demand_df.empty:
+            return
+
+        schedule_item_codes = set(schedule_df["item_code"].astype(str).str.strip())
+        self._build_item_supplier_mappings(
+            demand_df, supplier_info, schedule_item_codes
+        )
+        self._build_consumptions_from_schedule(schedule_df)
+
+        if self.num_vehicles_per_supplier is not None:
+            counts = {
+                s: self.num_vehicles_per_supplier for s in supplier_info
+            }
+        else:
+            from manufacture_jis.vehicle_bounds import compute_vehicle_bounds
+
+            counts = compute_vehicle_bounds(
+                list(self.c2consumption.values()),
+                self.s_to_i_set,
+                supplier_info,
+                self.pc_per_pallet,
+                self.rest_times,
+            )
+
+        logger.info(f"Vehicle counts: {counts}")
+        self._create_vehicles(supplier_info, counts)
+        self._populate_vehicle_mappings()
 
     def _load_packaging(self) -> None:
         df = _read_sheet(
@@ -166,21 +193,30 @@ class JISData:
             self.pc_per_pallet[row.item_code] = row.pc_per_pallet
             self.item_set.add(row.item_code)
 
-    def _load_suppliers(self) -> None:
+    def _read_supplier_info(self) -> dict[str, int]:
         df = _read_sheet(
             self.path, self.SUPPLIER_SHEET, SUPPLIER_COL_MAP, self._sheet_map
         )
+        info: dict[str, int] = {}
         if df.empty:
-            return
+            return info
         df["supplier"] = df["supplier"].astype(str).str.strip()
         df["vehicle_capacity"] = df["vehicle_capacity"].astype(int)
         for row in df.itertuples(index=False):
-            for k in range(1, self.num_vehicles_per_supplier + 1):
-                vid = f"{row.supplier}_车次{k}"
+            info[row.supplier] = row.vehicle_capacity
+        return info
+
+    def _create_vehicles(
+        self, supplier_info: dict[str, int], counts: dict[str, int]
+    ) -> None:
+        for supplier, capacity in supplier_info.items():
+            n = counts.get(supplier, 0)
+            for k in range(1, n + 1):
+                vid = f"{supplier}_车次{k}"
                 self.v2vehicle[vid] = Vehicle(
-                    supplier=row.supplier, v=vid, capacity=row.vehicle_capacity
+                    supplier=supplier, v=vid, capacity=capacity
                 )
-                self.s_to_v_set[row.supplier].add(vid)
+                self.s_to_v_set[supplier].add(vid)
 
     def _load_schedule(self) -> pd.DataFrame:
         df = _read_sheet(
@@ -206,37 +242,38 @@ class JISData:
         df["qty"] = pd.to_numeric(df["qty"], errors="raise").astype(int)
         return df
 
-    def _build_consumptions(
-        self, schedule_df: pd.DataFrame, demand_df: pd.DataFrame
+    def _build_item_supplier_mappings(
+        self,
+        demand_df: pd.DataFrame,
+        supplier_info: dict[str, int],
+        schedule_item_codes: set[str],
     ) -> None:
-        if demand_df.empty:
-            return
-
-        missing_schedule = set(demand_df["item_code"]) - set(schedule_df["item_code"])
+        missing_schedule = set(demand_df["item_code"]) - schedule_item_codes
         if missing_schedule:
-            raise ValueError(f"物料 {sorted(missing_schedule)[0]} 在排产信息中不存在")
+            raise ValueError(
+                f"物料 {sorted(missing_schedule)[0]} 在排产信息中不存在"
+            )
 
         missing_packaging = set(demand_df["item_code"]) - set(self.pc_per_pallet)
         if missing_packaging:
             raise ValueError(f"物料 {sorted(missing_packaging)[0]} 缺少包规")
 
-        missing_supplier = set(demand_df["supplier"]) - set(self.s_to_v_set)
+        missing_supplier = set(demand_df["supplier"]) - set(supplier_info)
         if missing_supplier:
             raise ValueError(f"供应商 {sorted(missing_supplier)[0]} 缺少车规")
 
-        # 从需求构建 supplier ↔ item 的静态关联
         for d_row in demand_df.itertuples(index=False):
-            vehicles = self.s_to_v_set[d_row.supplier]
             self.s_to_i_set[d_row.supplier].add(d_row.item_code)
             self.i_to_s_set[d_row.item_code].add(d_row.supplier)
-            self.i_to_v_set[d_row.item_code].update(vehicles)
             self.si2qty[(d_row.supplier, d_row.item_code)] += d_row.qty
             self.item_set.add(d_row.item_code)
 
+    def _build_consumptions_from_schedule(
+        self, schedule_df: pd.DataFrame
+    ) -> None:
         schedule_df["start_hour"] = self.datetime_to_hour(schedule_df["start_time"])
         schedule_df["finish_hour"] = self.datetime_to_hour(schedule_df["finish_time"])
 
-        # 按排产展开为小时级消耗，每个小时一条
         for s_row in schedule_df.itertuples(index=False):
             processing_time: int = math.ceil(
                 s_row.finish_hour - s_row.start_hour - s_row.rest_time
@@ -260,5 +297,11 @@ class JISData:
                     arrival_lb=arrival_lb,
                     arrival_ub=arrival_ub,
                 )
-                self.c_to_v_set[cid].update(self.i_to_v_set[s_row.item_code])
                 self.t_max = max(self.t_max, arrival_ub)
+
+    def _populate_vehicle_mappings(self) -> None:
+        for item, suppliers in self.i_to_s_set.items():
+            for supplier in suppliers:
+                self.i_to_v_set[item].update(self.s_to_v_set[supplier])
+        for cid, consumption in self.c2consumption.items():
+            self.c_to_v_set[cid].update(self.i_to_v_set[consumption.item])
