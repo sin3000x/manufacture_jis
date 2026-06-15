@@ -12,6 +12,10 @@ dependencies = [
   "xlsxwriter>=3.2.9",
   "pytest>=9.0.3",
   "loguru>=0.7.3",
+  "fastapi",
+  "uvicorn[standard]",
+  "python-multipart",
+  "jinja2",
 ]
 
 [tool.setuptools]

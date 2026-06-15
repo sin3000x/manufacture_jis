@@ -1,0 +1,222 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: #f5f5f5;
+  color: #333;
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 640px;
+  margin: 48px auto;
+  padding: 0 16px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 32px;
+}
+
+h1 {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 24px;
+  text-align: center;
+  color: #1a1a1a;
+}
+
+.section {
+  margin-bottom: 24px;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 4px;
+  color: #444;
+}
+
+label .desc {
+  display: block;
+  font-weight: 400;
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px;
+}
+
+input[type="file"],
+input[type="text"],
+input[type="number"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+input:focus {
+  outline: none;
+  border-color: #4a90d9;
+  box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.12);
+}
+
+.file-name {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #666;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  background: #4a90d9;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+button:hover:not(:disabled) {
+  background: #3a7bc8;
+}
+
+button:disabled {
+  background: #a0c4e8;
+  cursor: not-allowed;
+}
+
+.spinner {
+  display: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.button-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#status-area {
+  margin-top: 20px;
+  display: none;
+}
+
+#status-area.visible {
+  display: block;
+}
+
+#status-area .message {
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+#status-area .message.success {
+  background: #e6f7e6;
+  color: #2e7d32;
+  border: 1px solid #b7e4b7;
+}
+
+#status-area .message.warning {
+  background: #fff8e1;
+  color: #f57f17;
+  border: 1px solid #ffe082;
+  margin-top: 8px;
+}
+
+#status-area .message.warning ul {
+  margin: 8px 0 0 18px;
+}
+
+#status-area .message.warning li {
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+#status-area .message.error {
+  background: #fdecea;
+  color: #c62828;
+  border: 1px solid #f5c6cb;
+}
+
+.button-row {
+  margin-bottom: 20px;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid #eee;
+  margin: 20px 0;
+}
+
+.hour-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.hour-btn {
+  padding: 6px 4px;
+  font-size: 12px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  background: #fff;
+  color: #555;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+  width: auto;
+}
+
+.hour-btn:hover {
+  border-color: #4a90d9;
+  color: #4a90d9;
+}
+
+.hour-btn.active {
+  background: #fdecea;
+  border-color: #e57373;
+  color: #c62828;
+}
+
+.hour-btn.active:hover {
+  background: #f8d7da;
+  border-color: #d32f2f;
+}

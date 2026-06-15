@@ -124,6 +124,9 @@ class JISData:
             t for t in range(self.t_max + 1) if not self.is_rest_time(t)
         )
 
+        if not self.arrival_domain:
+            raise ValueError("没有可选择的到达时间")
+
     def __repr__(self) -> str:
         return f"JISData({self.path})"
 

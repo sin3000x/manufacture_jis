@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JIS 物料配送优化系统</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <h1>JIS 物料配送优化系统</h1>
+
+    <form id="solve-form" enctype="multipart/form-data">
+      <div class="section">
+        <div class="section-title">上传文件</div>
+        <div class="form-group">
+          <label for="file">选择 Excel 文件</label>
+          <input type="file" id="file" name="file" accept=".xlsx,.xls" required>
+          <div class="file-name" id="file-name"></div>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="section">
+        <div class="section-title">参数配置</div>
+
+        <div class="form-group">
+          <label for="arrival_lead_time">
+            到达提前期（小时）
+            <span class="desc">物料最早可在消耗时间前多少小时到达。数值越大，到达时间窗口越宽，优化空间越大。</span>
+          </label>
+          <input type="number" id="arrival_lead_time" name="arrival_lead_time"
+                 value="{{ default_lead_time }}" min="1" required>
+        </div>
+
+        <div class="form-group">
+          <label for="arrival_lag_time">
+            到达滞后期（小时）
+            <span class="desc">物料最晚可在消耗时间前多少小时到达。数值越大，到达时间窗口越宽，但物料不能晚于此时间到达。</span>
+          </label>
+          <input type="number" id="arrival_lag_time" name="arrival_lag_time"
+                 value="{{ default_lag_time }}" min="1" required>
+        </div>
+
+        <div class="form-group">
+          <label>
+            休息时段
+            <span class="desc">24小时制，勾选不可到达的时段。例如午休、夜休等时段。</span>
+          </label>
+          <div class="hour-grid" id="rest-times-grid"></div>
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button type="submit" id="submit-btn" disabled>
+          <span class="button-content">
+            <span class="spinner" id="spinner"></span>
+            <span id="btn-text">开始优化</span>
+          </span>
+        </button>
+      </div>
+    </form>
+
+    <div id="status-area">
+      <div class="message" id="status-message"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const defaultRestTimes = {{ default_rest_times | tojson }};
+
+const form = document.getElementById('solve-form');
+const fileInput = document.getElementById('file');
+const fileName = document.getElementById('file-name');
+const submitBtn = document.getElementById('submit-btn');
+const btnText = document.getElementById('btn-text');
+const spinner = document.getElementById('spinner');
+const statusArea = document.getElementById('status-area');
+const statusMessage = document.getElementById('status-message');
+
+// Build the hour toggle grid
+(function buildHourGrid() {
+  const grid = document.getElementById('rest-times-grid');
+  for (let h = 0; h < 24; h++) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'hour-btn' + (defaultRestTimes.includes(h) ? ' active' : '');
+    btn.textContent = String(h).padStart(2, '0') + ':00';
+    btn.dataset.hour = h;
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('active');
+    });
+    grid.appendChild(btn);
+  }
+})();
+
+function getRestTimesValue() {
+  const active = document.querySelectorAll('#rest-times-grid .hour-btn.active');
+  return Array.from(active).map(b => b.dataset.hour).join(',');
+}
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length > 0) {
+    fileName.textContent = '已选择：' + fileInput.files[0].name;
+    submitBtn.disabled = false;
+  } else {
+    fileName.textContent = '';
+    submitBtn.disabled = true;
+  }
+});
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setRunning(true);
+
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  formData.append('arrival_lead_time', document.getElementById('arrival_lead_time').value);
+  formData.append('arrival_lag_time', document.getElementById('arrival_lag_time').value);
+  formData.append('rest_times', getRestTimesValue());
+
+  try {
+    const resp = await fetch('/solve', { method: 'POST', body: formData });
+
+    if (resp.ok) {
+      const issues = resp.headers.get('X-JIS-Issues');
+      const blob = await resp.blob();
+      const disposition = resp.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename\*=UTF-8''(.+)/);
+      const downloadName = match ? decodeURIComponent(match[1]) : 'result.xlsx';
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = downloadName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      if (issues) {
+        const parsed = JSON.parse(issues);
+        showWarning('优化完成，结果已下载。但存在以下需要注意的问题：', parsed);
+      } else {
+        showSuccess('优化完成，结果已下载。');
+      }
+    } else {
+      const err = await resp.json();
+      showError(err.error, err.details);
+    }
+  } catch (err) {
+    showError('网络请求失败：' + err.message);
+  } finally {
+    setRunning(false);
+  }
+});
+
+function setRunning(running) {
+  submitBtn.disabled = running;
+  spinner.style.display = running ? 'inline-block' : 'none';
+  btnText.textContent = running ? '正在优化，请稍候...' : '开始优化';
+  if (running) {
+    statusArea.classList.remove('visible');
+  }
+}
+
+function showSuccess(msg) {
+  statusMessage.className = 'message success';
+  statusMessage.textContent = msg;
+  statusArea.classList.add('visible');
+}
+
+function showWarning(msg, issues) {
+  const existingSuccess = statusArea.querySelector('.message.success');
+  let html = msg;
+  if (issues && issues.length > 0) {
+    html += '<ul>' + issues.map(i => '<li>' + escapeHtml(i) + '</li>').join('') + '</ul>';
+  }
+  const div = document.createElement('div');
+  div.className = 'message warning';
+  div.innerHTML = html;
+  statusArea.appendChild(div);
+  statusArea.classList.add('visible');
+}
+
+function showError(msg, details) {
+  statusMessage.className = 'message error';
+  let html = escapeHtml(msg);
+  if (details && details.length > 0) {
+    html += '<ul>' + details.map(d => '<li>' + escapeHtml(d) + '</li>').join('') + '</ul>';
+  }
+  statusMessage.innerHTML = html;
+  statusArea.classList.add('visible');
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+</script>
+</body>
+</html>
