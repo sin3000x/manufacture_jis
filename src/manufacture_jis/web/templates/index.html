@@ -126,7 +126,6 @@ form.addEventListener('submit', async (e) => {
     const resp = await fetch('/solve', { method: 'POST', body: formData });
 
     if (resp.ok) {
-      const issues = resp.headers.get('X-JIS-Issues');
       const blob = await resp.blob();
       const disposition = resp.headers.get('Content-Disposition') || '';
       const match = disposition.match(/filename\*=UTF-8''(.+)/);
@@ -141,12 +140,7 @@ form.addEventListener('submit', async (e) => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      if (issues) {
-        const parsed = JSON.parse(issues);
-        showWarning('优化完成，结果已下载。但存在以下需要注意的问题：', parsed);
-      } else {
-        showSuccess('优化完成，结果已下载。');
-      }
+      showSuccess('优化完成，结果已下载。');
     } else {
       const err = await resp.json();
       showError(err.error, err.details);
@@ -170,19 +164,6 @@ function setRunning(running) {
 function showSuccess(msg) {
   statusMessage.className = 'message success';
   statusMessage.textContent = msg;
-  statusArea.classList.add('visible');
-}
-
-function showWarning(msg, issues) {
-  const existingSuccess = statusArea.querySelector('.message.success');
-  let html = msg;
-  if (issues && issues.length > 0) {
-    html += '<ul>' + issues.map(i => '<li>' + escapeHtml(i) + '</li>').join('') + '</ul>';
-  }
-  const div = document.createElement('div');
-  div.className = 'message warning';
-  div.innerHTML = html;
-  statusArea.appendChild(div);
   statusArea.classList.add('visible');
 }
 
