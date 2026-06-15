@@ -156,7 +156,7 @@ class JISCPModel:
             for i in self.data.s_to_i_set[s]:
                 self.model.add(
                     sum(self.loaded_pallets.get((v, i), 0) for v in v_set)
-                    == math.ceil(self.data.si2qty[(s, i)] / self.data.pc_per_pallet[i])
+                    >= math.ceil(self.data.si2qty[(s, i)] / self.data.pc_per_pallet[i])
                 )
 
     def _break_symmetry(self):

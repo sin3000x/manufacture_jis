@@ -9,5 +9,6 @@ def test_model():
     result = model.run()
     vehicles = result.vehicles
     assert len(vehicles) == 2
+    assert not result.issues
     result.write_excel()
     
