@@ -1,5 +1,4 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
 
 cd "$(dirname "$0")"
 
@@ -8,10 +7,12 @@ mkdir -p logs
 PID_FILE="logs/server.pid"
 LOG_FILE="logs/server_$(date +%Y%m%d).log"
 
-# If already running, do nothing
-if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
-    echo "Server is already running (PID $(cat "$PID_FILE"))"
-    exit 0
+if [ -f "$PID_FILE" ]; then
+    PID=$(cat "$PID_FILE")
+    if kill -0 "$PID" 2>/dev/null; then
+        echo "Server is already running (PID $PID)"
+        exit 0
+    fi
 fi
 
 echo "Starting server..."
