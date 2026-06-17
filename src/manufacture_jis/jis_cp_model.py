@@ -1,5 +1,4 @@
 from collections import defaultdict
-import math
 import re
 from ortools.sat.python import cp_model
 
@@ -86,6 +85,22 @@ class JISCPModel:
             for i in data.item_set
             for v in data.i_to_v_set[i]
         }
+        # 供应商s的物料i多于分配的件数
+        self.overload_pc: dict[tuple[str, str], cp_model.IntVar] = {
+            (s, i): self.model.new_int_var(
+                0, data.si2qty[(s, i)], f"overload_pc_{s}_{i}"
+            )
+            for s, i_set in data.s_to_i_set.items()
+            for i in i_set
+        }
+        # 供应商s的物料i少于分配的件数
+        self.underload_pc: dict[tuple[str, str], cp_model.IntVar] = {
+            (s, i): self.model.new_int_var(
+                0, data.si2qty[(s, i)], f"underload_pc_{s}_{i}"
+            )
+            for s, i_set in data.s_to_i_set.items()
+            for i in i_set
+        }
 
     def _add_constraints(self):
         self._constraint_exactly_one_assign()
@@ -98,7 +113,12 @@ class JISCPModel:
 
     def _set_objective(self):
         """最小化启用车辆数量"""
-        self.model.minimize(sum(self.use_vehicle.values()))
+        self.obj = {
+            "total_vehicles": 100 * sum(self.use_vehicle.values()),
+            "total_overload_pc": sum(self.overload_pc.values()),
+            "total_underload_pc": sum(self.underload_pc.values()),
+        }
+        self.model.minimize(sum(self.obj.values()))
 
     def _constraint_exactly_one_assign(self):
         """每条消耗只能被一辆车送"""
@@ -152,11 +172,17 @@ class JISCPModel:
 
     def _constraint_supplier_item_qty(self):
         """供应商物料数量约束"""
-        for s, v_set in self.data.s_to_v_set.items():
-            for i in self.data.s_to_i_set[s]:
-                self.model.add(
+        data = self.data
+        for s, v_set in data.s_to_v_set.items():
+            for i in data.s_to_i_set[s]:
+                total_load_pc = (
                     sum(self.loaded_pallets.get((v, i), 0) for v in v_set)
-                    >= math.ceil(self.data.si2qty[(s, i)] / self.data.pc_per_pallet[i])
+                    * data.pc_per_pallet[i]
+                )
+                overload_pc = self.overload_pc[s, i]
+                underload_pc = self.underload_pc[s, i]
+                self.model.add(
+                    total_load_pc + overload_pc - underload_pc == data.si2qty[(s, i)]
                 )
 
     def _break_symmetry(self):
