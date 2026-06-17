@@ -1,0 +1,9 @@
+# Shell scripts must always use LF line endings.
+*.sh text eol=lf
+
+# Keep common text files normalized as LF.
+*.py text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
