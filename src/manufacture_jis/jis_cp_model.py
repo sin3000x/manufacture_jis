@@ -88,7 +88,7 @@ class JISCPModel:
         # 供应商s的物料i多于分配的件数
         self.overload_pc: dict[tuple[str, str], cp_model.IntVar] = {
             (s, i): self.model.new_int_var(
-                0, data.si2qty[(s, i)], f"overload_pc_{s}_{i}"
+                0, 1000000, f"overload_pc_{s}_{i}"
             )
             for s, i_set in data.s_to_i_set.items()
             for i in i_set
@@ -96,7 +96,7 @@ class JISCPModel:
         # 供应商s的物料i少于分配的件数
         self.underload_pc: dict[tuple[str, str], cp_model.IntVar] = {
             (s, i): self.model.new_int_var(
-                0, data.si2qty[(s, i)], f"underload_pc_{s}_{i}"
+                0, 1000000, f"underload_pc_{s}_{i}"
             )
             for s, i_set in data.s_to_i_set.items()
             for i in i_set
@@ -182,7 +182,7 @@ class JISCPModel:
                 overload_pc = self.overload_pc[s, i]
                 underload_pc = self.underload_pc[s, i]
                 self.model.add(
-                    total_load_pc + overload_pc - underload_pc == data.si2qty[(s, i)]
+                    total_load_pc - overload_pc + underload_pc == data.si2qty[(s, i)]
                 )
 
     def _break_symmetry(self):
