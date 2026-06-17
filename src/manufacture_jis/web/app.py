@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import tempfile
 import uuid
@@ -148,7 +149,8 @@ async def solve(
             "Content-Disposition": f"attachment; filename*=UTF-8''{quote(download_name)}",
         }
         if result.issues:
-            response_headers["X-JIS-Issues"] = json.dumps(result.issues, ensure_ascii=False)
+            issues_json = json.dumps(result.issues, ensure_ascii=False)
+            response_headers["X-JIS-Issues-B64"] = base64.b64encode(issues_json.encode("utf-8")).decode("ascii")
 
         return Response(
             content=result_bytes,

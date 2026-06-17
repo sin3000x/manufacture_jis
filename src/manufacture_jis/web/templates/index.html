@@ -141,7 +141,6 @@ form.addEventListener('submit', async (e) => {
       const disposition = resp.headers.get('Content-Disposition') || '';
       const match = disposition.match(/filename\*=UTF-8''(.+)/);
       const downloadName = match ? decodeURIComponent(match[1]) : 'result.xlsx';
-
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
