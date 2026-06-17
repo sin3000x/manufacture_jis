@@ -10,6 +10,7 @@
 <div class="container">
   <div class="card">
     <h1>JIS 物料配送优化系统</h1>
+    <div class="hint">页面底部会实时显示后端 loguru 日志，方便观察求解过程。</div>
 
     <form id="solve-form" enctype="multipart/form-data">
       <div class="section">
@@ -66,6 +67,15 @@
     <div id="status-area">
       <div class="message" id="status-message"></div>
     </div>
+
+    <div class="section log-section">
+      <div class="section-title">运行日志</div>
+      <div class="log-toolbar">
+        <span id="log-connection-status" class="log-connection">正在连接...</span>
+        <button type="button" id="clear-log-btn" class="secondary-btn">清空日志</button>
+      </div>
+      <div id="log-panel" class="log-panel" aria-live="polite"></div>
+    </div>
   </div>
 </div>
 
@@ -80,6 +90,9 @@ const btnText = document.getElementById('btn-text');
 const spinner = document.getElementById('spinner');
 const statusArea = document.getElementById('status-area');
 const statusMessage = document.getElementById('status-message');
+const logPanel = document.getElementById('log-panel');
+const logConnectionStatus = document.getElementById('log-connection-status');
+const clearLogBtn = document.getElementById('clear-log-btn');
 
 // Build the hour toggle grid
 (function buildHourGrid() {
@@ -176,6 +189,57 @@ function showError(msg, details) {
   statusMessage.innerHTML = html;
   statusArea.classList.add('visible');
 }
+
+function appendLogLine(entry) {
+  const line = document.createElement('div');
+  line.className = 'log-line log-' + entry.level.toLowerCase();
+  line.textContent = '[' + entry.time + '] [' + entry.level + '] ' + entry.message;
+  logPanel.appendChild(line);
+  logPanel.scrollTop = logPanel.scrollHeight;
+}
+
+function setLogStatus(text, online) {
+  logConnectionStatus.textContent = text;
+  logConnectionStatus.classList.toggle('online', online);
+  logConnectionStatus.classList.toggle('offline', !online);
+}
+
+function connectLogWebSocket() {
+  const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const socket = new WebSocket(scheme + '//' + window.location.host + '/ws/logs');
+
+  socket.addEventListener('open', () => {
+    setLogStatus('日志已连接', true);
+  });
+
+  socket.addEventListener('message', (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.type === 'log') {
+        appendLogLine(data);
+      } else if (data.type === 'status') {
+        appendLogLine({ time: new Date().toISOString().slice(0, 19).replace('T', ' '), level: 'INFO', message: data.message });
+      }
+    } catch (err) {
+      appendLogLine({ time: new Date().toISOString().slice(0, 19).replace('T', ' '), level: 'WARN', message: String(err) });
+    }
+  });
+
+  socket.addEventListener('close', () => {
+    setLogStatus('日志连接已断开，正在重连...', false);
+    window.setTimeout(connectLogWebSocket, 2000);
+  });
+
+  socket.addEventListener('error', () => {
+    setLogStatus('日志连接异常', false);
+  });
+}
+
+clearLogBtn.addEventListener('click', () => {
+  logPanel.innerHTML = '';
+});
+
+connectLogWebSocket();
 
 function escapeHtml(str) {
   const div = document.createElement('div');

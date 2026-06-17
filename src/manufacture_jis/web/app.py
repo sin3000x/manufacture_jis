@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi import FastAPI, File, Form, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -24,11 +24,45 @@ templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
 
 UPLOAD_DIR = Path(tempfile.gettempdir()) / "jis_uploads"
 DEFAULT_REST_TIMES = "1,2,7,12,13,18"
+_LOG_QUEUE: asyncio.Queue[dict[str, str]] | None = None
+_LOG_SINK_ID: int | None = None
+_LOG_CLIENTS: set[WebSocket] = set()
+
+
+class _WebSocketLogSink:
+    def __call__(self, message) -> None:
+        record = message.record
+        payload = {
+            "time": record["time"].strftime("%Y-%m-%d %H:%M:%S"),
+            "level": record["level"].name,
+            "message": record["message"],
+            "name": record["name"],
+        }
+        _push_log_event(payload)
 
 
 @app.on_event("startup")
-def startup() -> None:
+async def startup() -> None:
+    global _LOG_QUEUE, _LOG_SINK_ID
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    _LOG_QUEUE = asyncio.Queue(maxsize=500)
+    _LOG_SINK_ID = logger.add(
+        _WebSocketLogSink(),
+        level="INFO",
+        enqueue=True,
+        backtrace=False,
+        diagnose=False,
+        catch=False,
+    )
+    asyncio.create_task(_log_broker())
+
+
+@app.on_event("shutdown")
+def shutdown() -> None:
+    global _LOG_SINK_ID
+    if _LOG_SINK_ID is not None:
+        logger.remove(_LOG_SINK_ID)
+        _LOG_SINK_ID = None
 
 
 @app.get("/")
@@ -42,6 +76,20 @@ def index(request: Request):
             "default_rest_times": [1, 2, 7, 12, 13, 18],
         },
     )
+
+
+@app.websocket("/ws/logs")
+async def log_stream(websocket: WebSocket):
+    await websocket.accept()
+    _LOG_CLIENTS.add(websocket)
+    try:
+        await websocket.send_json({"type": "status", "message": "日志连接已建立"})
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        _LOG_CLIENTS.discard(websocket)
 
 
 @app.post("/solve")
@@ -89,8 +137,7 @@ async def solve(
             rest_times=rest_times_list,
         )
 
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, _run_solver, data)
+        result = await asyncio.to_thread(_run_solver, data)
 
         result.write_excel(output_path)
 
@@ -140,6 +187,30 @@ def _parse_rest_times(raw: str) -> list[int] | None:
 def _run_solver(data: JISData):
     model = JISCPModel(data)
     return model.run()
+
+
+def _push_log_event(payload: dict[str, str]) -> None:
+    if _LOG_QUEUE is None:
+        return
+    try:
+        _LOG_QUEUE.put_nowait(payload)
+    except asyncio.QueueFull:
+        pass
+
+
+async def _log_broker() -> None:
+    if _LOG_QUEUE is None:
+        return
+    while True:
+        payload = await _LOG_QUEUE.get()
+        dead_clients: set[WebSocket] = set()
+        for client in list(_LOG_CLIENTS):
+            try:
+                await client.send_json({"type": "log", **payload})
+            except Exception:
+                dead_clients.add(client)
+        for client in dead_clients:
+            _LOG_CLIENTS.discard(client)
 
 
 def _cleanup(path: Path) -> None:
