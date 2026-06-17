@@ -85,6 +85,9 @@ class JISData:
         self.arrival_lead_time = arrival_lead_time
         self.arrival_lag_time = arrival_lag_time
         self.rest_times = rest_times or []
+        logger.info(
+            f"T-{self.arrival_lead_time} ~ T-{self.arrival_lag_time}, rest_times: {self.rest_times}"
+        )
 
         # 消耗id -> 消耗
         self.c2consumption: dict[str, HourlyConcumption] = {}
