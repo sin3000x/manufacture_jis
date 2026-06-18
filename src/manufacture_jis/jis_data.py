@@ -170,7 +170,7 @@ class JISData:
         self._build_item_supplier_mappings(
             demand_df, supplier_info, schedule_item_codes
         )
-        self._build_consumptions_from_schedule(schedule_df)
+        self._build_consumptions_from_schedule(schedule_df, supplier_info)
 
         if self.num_vehicles_per_supplier is not None:
             counts = {s: self.num_vehicles_per_supplier for s in supplier_info}
@@ -274,7 +274,9 @@ class JISData:
             self.si2qty[(d_row.supplier, d_row.item_code)] += d_row.qty
             self.item_set.add(d_row.item_code)
 
-    def _build_consumptions_from_schedule(self, schedule_df: pd.DataFrame) -> None:
+    def _build_consumptions_from_schedule(
+        self, schedule_df: pd.DataFrame, supplier_info: dict[str, int]
+    ) -> None:
         interval_hours: int = self.consumption_interval_hours
         schedule_df["start_hour"] = self.datetime_to_hour(schedule_df["start_time"])
         schedule_df["finish_hour"] = self.datetime_to_hour(schedule_df["finish_time"])
@@ -301,20 +303,49 @@ class JISData:
                         interval_qty += remainder
 
                 h = s_row.start_hour + interval_start
-                cid = f"{s_row.mfg_order}_h{h}"
                 arrival_lb = h - self.arrival_lead_time
                 arrival_ub = h - self.arrival_lag_time
 
-                self.c2consumption[cid] = Concumption(
-                    cid=cid,
-                    mfg_order=s_row.mfg_order,
-                    consumption_time=h,
-                    item=s_row.item_code,
-                    qty=interval_qty,
-                    arrival_lb=arrival_lb,
-                    arrival_ub=arrival_ub,
-                )
-                self.t_max = max(self.t_max, arrival_ub)
+                suppliers = self.i_to_s_set.get(s_row.item_code, set())
+                ppp = self.pc_per_pallet.get(s_row.item_code)
+                candidate_caps = [
+                    supplier_info[s] for s in suppliers if s in supplier_info
+                ]
+                if ppp and candidate_caps:
+                    min_cap = min(candidate_caps)
+                    total_pallets = math.ceil(interval_qty / ppp)
+                    n = math.ceil(total_pallets / min_cap)
+                else:
+                    n = 1
+
+                if n <= 1:
+                    cid = f"{s_row.mfg_order}_h{h}"
+                    self.c2consumption[cid] = Concumption(
+                        cid=cid,
+                        mfg_order=s_row.mfg_order,
+                        consumption_time=h,
+                        item=s_row.item_code,
+                        qty=interval_qty,
+                        arrival_lb=arrival_lb,
+                        arrival_ub=arrival_ub,
+                    )
+                    self.t_max = max(self.t_max, arrival_ub)
+                else:
+                    base_sub = interval_qty // n
+                    rem_sub = interval_qty % n
+                    for j in range(n):
+                        sub_qty = base_sub + (1 if j < rem_sub else 0)
+                        cid = f"{s_row.mfg_order}_h{h}-{j + 1}"
+                        self.c2consumption[cid] = Concumption(
+                            cid=cid,
+                            mfg_order=s_row.mfg_order,
+                            consumption_time=h,
+                            item=s_row.item_code,
+                            qty=sub_qty,
+                            arrival_lb=arrival_lb,
+                            arrival_ub=arrival_ub,
+                        )
+                    self.t_max = max(self.t_max, arrival_ub)
 
     def _populate_vehicle_mappings(self) -> None:
         for item, suppliers in self.i_to_s_set.items():
