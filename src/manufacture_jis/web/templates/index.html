@@ -51,6 +51,14 @@
           <span class="desc">将任务令按 N 小时为粒度拆分为消耗记录，默认 4 小时。</span>
         </div>
 
+        <div class="form-group form-group-inline">
+          <label for="max_vehicles_per_slot">每家供应商，每小时到货车辆尽量不多于</label>
+          <input type="number" id="max_vehicles_per_slot" name="max_vehicles_per_slot"
+                 value="{{ default_max_vehicles_per_slot }}" min="1">
+          <label for="max_vehicles_per_slot" class="label-suffix">辆</label>
+          <span class="desc">软约束，超出时求解器会尝试分散到不同时刻，但不保证严格满足。</span>
+        </div>
+
         <div class="form-group">
           <label>
             休息时段
@@ -140,6 +148,7 @@ form.addEventListener('submit', async (e) => {
   formData.append('arrival_lead_time', document.getElementById('arrival_lead_time').value);
   formData.append('arrival_lag_time', document.getElementById('arrival_lag_time').value);
   formData.append('consumption_interval_hours', document.getElementById('consumption_interval_hours').value);
+  formData.append('max_vehicles_per_slot', document.getElementById('max_vehicles_per_slot').value);
   formData.append('rest_times', getRestTimesValue());
 
   try {
