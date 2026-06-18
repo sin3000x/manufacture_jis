@@ -101,6 +101,18 @@ class JISCPModel:
             for s, i_set in data.s_to_i_set.items()
             for i in i_set
         }
+        # 车辆v是否在时刻t到达（used且arrival==t）
+        self.used_at: dict[tuple[str, int], cp_model.BoolVar] = {
+            (v, t): self.model.new_bool_var(f"used_at_{v}_{t}")
+            for v in data.v2vehicle
+            for t in data.arrival_domain
+        }
+        # 供应商s在时刻t超出max_vehicles_per_slot的车辆数
+        self.slot_excess: dict[tuple[str, int], cp_model.IntVar] = {
+            (s, t): self.model.new_int_var(0, len(v_set), f"slot_excess_{s}_{t}")
+            for s, v_set in data.s_to_v_set.items()
+            for t in data.arrival_domain
+        }
 
     def _add_constraints(self):
         self._constraint_exactly_one_assign()
@@ -109,6 +121,7 @@ class JISCPModel:
         self._constraint_loaded_pallets()
         self._constraint_vehicle_capacity()
         self._constraint_supplier_item_qty()
+        self._constraint_slot_concurrency()
         self._break_symmetry()
 
     def _set_objective(self):
@@ -117,6 +130,7 @@ class JISCPModel:
             "total_vehicles": sum(self.use_vehicle.values()),
             "total_overload_pc": sum(self.overload_pc.values()),
             "total_underload_pc": sum(self.underload_pc.values()),
+            "total_slot_excess": sum(self.slot_excess.values()),
         }
         self.model.minimize(sum(self.obj.values()))
 
@@ -184,6 +198,25 @@ class JISCPModel:
                 self.model.add(
                     total_load_pc - overload_pc + underload_pc == data.si2qty[(s, i)]
                 )
+
+    def _constraint_slot_concurrency(self):
+        """软约束：同一供应商同一时刻到达的车辆数尽量不超过 max_vehicles_per_slot"""
+        data = self.data
+        n = data.max_vehicles_per_slot
+
+        for v in data.v2vehicle:
+            for t in data.arrival_domain:
+                b = self.used_at[v, t]
+                self.model.add_implication(b, self.use_vehicle[v])
+                self.model.add(self.arrival[v] == t).only_enforce_if(b)
+            self.model.add(
+                sum(self.used_at[v, t] for t in data.arrival_domain) == self.use_vehicle[v]
+            )
+
+        for s, v_set in data.s_to_v_set.items():
+            for t in data.arrival_domain:
+                t_usage = sum(self.used_at[v, t] for v in v_set)
+                self.model.add(self.slot_excess[s, t] >= t_usage - n)
 
     def _break_symmetry(self):
         """打破对称性"""

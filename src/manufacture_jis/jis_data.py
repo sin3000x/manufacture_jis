@@ -80,6 +80,7 @@ class JISData:
         arrival_lag_time: int = 3,
         rest_times: list[int] | None = None,
         consumption_interval_hours: int = 1,
+        max_vehicles_per_slot: int = 1,
     ):
         self.path = Path(path)
         self.num_vehicles_per_supplier = num_vehicles_per_supplier
@@ -87,10 +88,12 @@ class JISData:
         self.arrival_lag_time = arrival_lag_time
         self.rest_times = rest_times or []
         self.consumption_interval_hours = consumption_interval_hours
+        self.max_vehicles_per_slot = max_vehicles_per_slot
         logger.info(
             f"T-{self.arrival_lead_time} ~ T-{self.arrival_lag_time}, "
             f"rest_times: {self.rest_times}, "
-            f"consumption_interval_hours: {self.consumption_interval_hours}"
+            f"consumption_interval_hours: {self.consumption_interval_hours}, "
+            f"max_vehicles_per_slot: {self.max_vehicles_per_slot}"
         )
 
         # 消耗id -> 消耗
