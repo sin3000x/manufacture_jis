@@ -79,14 +79,18 @@ class JISData:
         arrival_lead_time: int = 8,
         arrival_lag_time: int = 3,
         rest_times: list[int] | None = None,
+        consumption_interval_hours: int = 1,
     ):
         self.path = Path(path)
         self.num_vehicles_per_supplier = num_vehicles_per_supplier
         self.arrival_lead_time = arrival_lead_time
         self.arrival_lag_time = arrival_lag_time
         self.rest_times = rest_times or []
+        self.consumption_interval_hours = consumption_interval_hours
         logger.info(
-            f"T-{self.arrival_lead_time} ~ T-{self.arrival_lag_time}, rest_times: {self.rest_times}"
+            f"T-{self.arrival_lead_time} ~ T-{self.arrival_lag_time}, "
+            f"rest_times: {self.rest_times}, "
+            f"consumption_interval_hours: {self.consumption_interval_hours}"
         )
 
         # 消耗id -> 消耗
@@ -169,9 +173,7 @@ class JISData:
         self._build_consumptions_from_schedule(schedule_df)
 
         if self.num_vehicles_per_supplier is not None:
-            counts = {
-                s: self.num_vehicles_per_supplier for s in supplier_info
-            }
+            counts = {s: self.num_vehicles_per_supplier for s in supplier_info}
         else:
             from manufacture_jis.vehicle_bounds import compute_vehicle_bounds
 
@@ -256,9 +258,7 @@ class JISData:
     ) -> None:
         missing_schedule = set(demand_df["item_code"]) - schedule_item_codes
         if missing_schedule:
-            raise ValueError(
-                f"物料 {sorted(missing_schedule)[0]} 在排产信息中不存在"
-            )
+            raise ValueError(f"物料 {sorted(missing_schedule)[0]} 在排产信息中不存在")
 
         missing_packaging = set(demand_df["item_code"]) - set(self.pc_per_pallet)
         if missing_packaging:
@@ -274,9 +274,8 @@ class JISData:
             self.si2qty[(d_row.supplier, d_row.item_code)] += d_row.qty
             self.item_set.add(d_row.item_code)
 
-    def _build_consumptions_from_schedule(
-        self, schedule_df: pd.DataFrame
-    ) -> None:
+    def _build_consumptions_from_schedule(self, schedule_df: pd.DataFrame) -> None:
+        interval_hours: int = self.consumption_interval_hours
         schedule_df["start_hour"] = self.datetime_to_hour(schedule_df["start_time"])
         schedule_df["finish_hour"] = self.datetime_to_hour(schedule_df["finish_time"])
 
@@ -287,10 +286,22 @@ class JISData:
             base_qty: int = s_row.planned_qty // processing_time
             remainder: int = s_row.planned_qty % processing_time
 
-            for k in range(processing_time + (1 if remainder > 0 else 0)):
-                h = s_row.start_hour + k
+            total_hours = processing_time + (1 if remainder > 0 else 0)
+            num_intervals = math.ceil(total_hours / interval_hours)
+
+            for i in range(num_intervals):
+                interval_start = i * interval_hours
+                interval_end = min((i + 1) * interval_hours, total_hours)
+
+                interval_qty = 0
+                for k in range(interval_start, interval_end):
+                    if k < processing_time:
+                        interval_qty += base_qty
+                    else:
+                        interval_qty += remainder
+
+                h = s_row.start_hour + interval_start
                 cid = f"{s_row.mfg_order}_h{h}"
-                hourly_qty = base_qty if k < processing_time else remainder
                 arrival_lb = h - self.arrival_lead_time
                 arrival_ub = h - self.arrival_lag_time
 
@@ -299,7 +310,7 @@ class JISData:
                     mfg_order=s_row.mfg_order,
                     consumption_time=h,
                     item=s_row.item_code,
-                    qty=hourly_qty,
+                    qty=interval_qty,
                     arrival_lb=arrival_lb,
                     arrival_ub=arrival_ub,
                 )
