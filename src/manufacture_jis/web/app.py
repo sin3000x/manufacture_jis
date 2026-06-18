@@ -74,6 +74,7 @@ def index(request: Request):
         context={
             "default_lead_time": 8,
             "default_lag_time": 3,
+            "default_interval_hours": 4,
             "default_rest_times": [1, 2, 7, 12, 13, 18],
         },
     )
@@ -98,6 +99,7 @@ async def solve(
     file: UploadFile = File(...),
     arrival_lead_time: int = Form(8),
     arrival_lag_time: int = Form(3),
+    consumption_interval_hours: int = Form(1),
     rest_times: str = Form(DEFAULT_REST_TIMES),
 ):
     if not file.filename or not file.filename.lower().endswith((".xlsx", ".xls")):
@@ -123,6 +125,11 @@ async def solve(
             status_code=422,
             content={"error": "到达滞后期必须大于 0"},
         )
+    if consumption_interval_hours < 1:
+        return JSONResponse(
+            status_code=422,
+            content={"error": "任务令拆分小时数必须大于 0"},
+        )
 
     input_path = UPLOAD_DIR / f"{uuid.uuid4().hex}_{file.filename}"
     output_path = UPLOAD_DIR / f"{uuid.uuid4().hex}_result.xlsx"
@@ -136,6 +143,7 @@ async def solve(
             arrival_lead_time=arrival_lead_time,
             arrival_lag_time=arrival_lag_time,
             rest_times=rest_times_list,
+            consumption_interval_hours=consumption_interval_hours,
         )
 
         result = await asyncio.to_thread(_run_solver, data)

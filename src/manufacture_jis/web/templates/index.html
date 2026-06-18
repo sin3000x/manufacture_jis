@@ -43,6 +43,14 @@
                  value="{{ default_lag_time }}" min="1" required>
         </div>
 
+        <div class="form-group form-group-inline">
+          <label for="consumption_interval_hours">任务令拆分为</label>
+          <input type="number" id="consumption_interval_hours" name="consumption_interval_hours"
+                 value="{{ default_interval_hours }}" min="1">
+          <label for="consumption_interval_hours" class="label-suffix">小时级的消耗</label>
+          <span class="desc">将任务令按 N 小时为粒度拆分为消耗记录，默认 4 小时。</span>
+        </div>
+
         <div class="form-group">
           <label>
             休息时段
@@ -131,6 +139,7 @@ form.addEventListener('submit', async (e) => {
   formData.append('file', fileInput.files[0]);
   formData.append('arrival_lead_time', document.getElementById('arrival_lead_time').value);
   formData.append('arrival_lag_time', document.getElementById('arrival_lag_time').value);
+  formData.append('consumption_interval_hours', document.getElementById('consumption_interval_hours').value);
   formData.append('rest_times', getRestTimesValue());
 
   try {
