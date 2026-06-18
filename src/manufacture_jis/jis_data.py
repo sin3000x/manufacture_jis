@@ -331,10 +331,9 @@ class JISData:
                     )
                     self.t_max = max(self.t_max, arrival_ub)
                 else:
-                    base_sub = interval_qty // n
-                    rem_sub = interval_qty % n
+                    full_load = min_cap * ppp
                     for j in range(n):
-                        sub_qty = base_sub + (1 if j < rem_sub else 0)
+                        sub_qty = full_load if j < n - 1 else interval_qty - full_load * (n - 1)
                         cid = f"{s_row.mfg_order}_h{h}-{j + 1}"
                         self.c2consumption[cid] = Concumption(
                             cid=cid,
