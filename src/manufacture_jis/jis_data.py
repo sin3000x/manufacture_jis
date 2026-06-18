@@ -8,7 +8,7 @@ from pathlib import Path
 from loguru import logger
 import pandas as pd
 
-from manufacture_jis.base import HourlyConcumption, Vehicle
+from manufacture_jis.base import Concumption, Vehicle
 
 SCHEDULE_COL_MAP = {
     "线体": "line",
@@ -90,7 +90,7 @@ class JISData:
         )
 
         # 消耗id -> 消耗
-        self.c2consumption: dict[str, HourlyConcumption] = {}
+        self.c2consumption: dict[str, Concumption] = {}
         # 车辆id -> 车辆
         self.v2vehicle: dict[str, Vehicle] = {}
         # 消耗id -> 可能送这条消耗的车辆id集合。
@@ -294,7 +294,7 @@ class JISData:
                 arrival_lb = h - self.arrival_lead_time
                 arrival_ub = h - self.arrival_lag_time
 
-                self.c2consumption[cid] = HourlyConcumption(
+                self.c2consumption[cid] = Concumption(
                     cid=cid,
                     mfg_order=s_row.mfg_order,
                     consumption_time=h,

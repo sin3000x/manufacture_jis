@@ -114,7 +114,7 @@ class JISCPModel:
     def _set_objective(self):
         """最小化启用车辆数量"""
         self.obj = {
-            "total_vehicles": 100 * sum(self.use_vehicle.values()),
+            "total_vehicles": sum(self.use_vehicle.values()),
             "total_overload_pc": sum(self.overload_pc.values()),
             "total_underload_pc": sum(self.underload_pc.values()),
         }

@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from manufacture_jis.base import HourlyConcumption
+from manufacture_jis.base import Concumption
 
 
 @dataclass
@@ -22,7 +22,7 @@ def _has_valid_arrival(lb: int, ub: int, rest_times: list[int]) -> bool:
 
 
 def _greedy_pack(
-    consumptions: list[HourlyConcumption],
+    consumptions: list[Concumption],
     capacity: int,
     pc_per_pallet: dict[str, int],
     rest_times: list[int],
@@ -68,7 +68,7 @@ def _greedy_pack(
 
 
 def compute_vehicle_bounds(
-    consumptions: list[HourlyConcumption],
+    consumptions: list[Concumption],
     s_to_i_set: dict[str, set[str]],
     supplier_capacities: dict[str, int],
     pc_per_pallet: dict[str, int],
