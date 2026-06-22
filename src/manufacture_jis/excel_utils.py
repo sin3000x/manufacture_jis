@@ -30,10 +30,14 @@ def write_df_to_excel(
     col_index = {name: i + 1 for i, name in enumerate(df.columns)}
     header_row = 1
 
-    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    center = Alignment(horizontal="center", vertical="center")
 
     normalized_merge_dict = _normalize_merge_dict(merge_dict)
     ordered_keys = sorted(normalized_merge_dict, key=len)
+
+    for row in ws.iter_rows():
+        for cell in row:
+            cell.alignment = center
 
     for group_keys in ordered_keys:
         target_cols = normalized_merge_dict[group_keys]
@@ -50,15 +54,13 @@ def write_df_to_excel(
             start_excel = rows[0] + header_row + 1
             end_excel = rows[-1] + header_row + 1
             for ci in target_col_indices:
-                if start_excel == end_excel:
-                    ws.cell(row=start_excel, column=ci).alignment = center
-                    continue
-                ws.merge_cells(
-                    start_row=start_excel,
-                    end_row=end_excel,
-                    start_column=ci,
-                    end_column=ci,
-                )
+                if start_excel != end_excel:
+                    ws.merge_cells(
+                        start_row=start_excel,
+                        end_row=end_excel,
+                        start_column=ci,
+                        end_column=ci,
+                    )
                 ws.cell(row=start_excel, column=ci).alignment = center
 
     wb.save(path)
