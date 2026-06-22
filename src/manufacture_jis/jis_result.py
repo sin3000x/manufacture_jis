@@ -9,6 +9,7 @@ import pandas as pd
 
 from manufacture_jis import RESULT_ROOT
 from manufacture_jis.base import Vehicle
+from manufacture_jis.excel_utils import write_df_to_excel
 from manufacture_jis.jis_data import JISData
 
 
@@ -47,7 +48,14 @@ class JISResult:
 
     def write_excel(self, path: str | Path = "") -> None:
         path = path or RESULT_ROOT / f"result_{self.data.path.stem}.xlsx"
-        self.output_df.to_excel(path, index=False)
+        merge_dict = {
+            ("供应商",): ["供应商"],
+            ("供应商", "车次"): ["车次", "总装载板数", "车规", "装载率", "到达时间"],
+            ("供应商", "车次", "物料编码"): ["物料编码", "包规", "装载板数"],
+        }
+        # Keep the merge spec close to the output schema so the Excel writer can
+        # stay generic and only reason about row ranges.
+        write_df_to_excel(self.output_df, path, merge_dict)
 
     def _check_exactly_one_assign(self) -> list[str]:
         issues: list[str] = []
@@ -185,22 +193,6 @@ class JISResult:
                 "arrival": "到达时间",
             },
         )
-
-        # 删除一些同维度下的重复值
-        df["s_group"] = df.groupby("供应商").ngroup()
-        df["sv_group"] = df.groupby(["供应商", "车次"]).ngroup()
-        df["svi_group"] = df.groupby(["供应商", "车次", "物料编码"]).ngroup()
-        merge_dict = {
-            "s_group": ["供应商"],
-            "sv_group": ["车次", "总装载板数", "车规", "装载率", "到达时间"],
-            "svi_group": ["物料编码", "包规", "装载板数"],
-        }
-        for merge_by, to_merge in merge_dict.items():
-            mask = df.duplicated(subset=merge_by, keep="first")
-            df.loc[mask, to_merge] = None
-
-        # 删除车次编号中的供应商前缀
-        df["车次"] = df["车次"].str.split("_").str[-1]
 
         df["装载量"] = df["装载板数"] * df["包规"]
         df["线体"] = df["任务令"].map(self.data.mfg_order_to_line)
