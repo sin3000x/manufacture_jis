@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
+import unicodedata
 
 import pandas as pd
 
@@ -34,6 +35,8 @@ def write_df_to_excel(
 
     normalized_merge_dict = _normalize_merge_dict(merge_dict)
     ordered_keys = sorted(normalized_merge_dict, key=len)
+
+    _apply_auto_width(ws, df)
 
     for row in ws.iter_rows():
         for cell in row:
@@ -78,3 +81,35 @@ def _normalize_merge_dict(
                 dedup_targets.append(col)
         normalized[group_keys] = dedup_targets
     return normalized
+
+
+def _apply_auto_width(ws, df: pd.DataFrame) -> None:
+    for column_cells in ws.columns:
+        first_cell = column_cells[0]
+        col_letter = first_cell.column_letter
+        header_value = first_cell.value
+        values = [header_value]
+        for cell in column_cells[1:]:
+            values.append(cell.value)
+
+        width = 0
+        for value in values:
+            width = max(width, _display_width(value))
+
+        if width <= 0:
+            continue
+
+        ws.column_dimensions[col_letter].width = min(width + 2, 40)
+
+
+def _display_width(value) -> int:
+    if value is None:
+        return 0
+    text = str(value)
+    width = 0
+    for char in text:
+        if unicodedata.east_asian_width(char) in {"F", "W", "A"}:
+            width += 2
+        else:
+            width += 1
+    return width
