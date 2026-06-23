@@ -50,6 +50,7 @@ def _read_sheet(
     sheet_name: str,
     col_map: dict[str, str],
     sheet_map: dict[str, str],
+    fillna_map: dict[str, object] | None = None,
 ) -> pd.DataFrame:
     actual = sheet_map.get(sheet_name.strip())
     if actual is None:
@@ -59,7 +60,10 @@ def _read_sheet(
     if df.empty:
         return df
     available = {k: v for k, v in col_map.items() if k in df.columns}
-    return df.rename(columns=available)[list(available.values())].dropna()
+    df = df.rename(columns=available)[list(available.values())]
+    if fillna_map:
+        df = df.fillna({k: v for k, v in fillna_map.items() if k in df.columns})
+    return df.dropna()
 
 
 class JISData:
@@ -235,7 +239,8 @@ class JISData:
 
     def _load_schedule(self) -> pd.DataFrame:
         df = _read_sheet(
-            self.path, self.SCHEDULE_SHEET, SCHEDULE_COL_MAP, self._sheet_map
+            self.path, self.SCHEDULE_SHEET, SCHEDULE_COL_MAP, self._sheet_map,
+            fillna_map={"rest_time": 0},
         )
         if df.empty:
             logger.error("排产信息为空")
