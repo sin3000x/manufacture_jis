@@ -63,7 +63,9 @@ def _read_sheet(
     df = df.rename(columns=available)[list(available.values())]
     if fillna_map:
         df = df.fillna({k: v for k, v in fillna_map.items() if k in df.columns})
-    return df.dropna()
+    df = df.dropna()
+    logger.info(f"读取 {sheet_name} 表，行数: {len(df)}")
+    return df.reset_index(drop=True)
 
 
 class JISData:
