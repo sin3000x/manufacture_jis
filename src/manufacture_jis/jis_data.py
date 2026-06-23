@@ -53,6 +53,7 @@ def _read_sheet(
 ) -> pd.DataFrame:
     actual = sheet_map.get(sheet_name.strip())
     if actual is None:
+        logger.error(f"工作表 '{sheet_name}' 不存在，可用: {list(sheet_map)}")
         raise ValueError(f"工作表 '{sheet_name}' 不存在，可用: {list(sheet_map)}")
     df = pd.read_excel(path, sheet_name=actual)
     if df.empty:
@@ -135,6 +136,7 @@ class JISData:
         )
 
         if not self.arrival_domain:
+            logger.error("没有可选择的到达时间")
             raise ValueError("没有可选择的到达时间")
 
     def __repr__(self) -> str:
@@ -146,12 +148,14 @@ class JISData:
     def datetime_to_hour(self, dt: pd.Series) -> pd.Series:
         """将 datetime Series 转为相对 origin 的小时偏移（整型）。"""
         if self.origin is None:
+            logger.error("origin 尚未初始化")
             raise ValueError("origin 尚未初始化")
         return ((dt - self.origin).dt.total_seconds() // 3600).astype(int)
 
     def hour_to_datetime(self, hours: pd.Series) -> pd.Series:
         """将小时偏移 Series 转回 datetime。"""
         if self.origin is None:
+            logger.error("origin 尚未初始化")
             raise ValueError("origin 尚未初始化")
         return self.origin + pd.to_timedelta(hours, unit="h")
 
@@ -234,6 +238,7 @@ class JISData:
             self.path, self.SCHEDULE_SHEET, SCHEDULE_COL_MAP, self._sheet_map
         )
         if df.empty:
+            logger.error("排产信息为空")
             raise ValueError("排产信息为空")
         df["item_code"] = df["item_code"].astype(str).str.strip()
         df["mfg_order"] = df["mfg_order"].astype(str).str.strip()
@@ -261,15 +266,18 @@ class JISData:
     ) -> None:
         missing_schedule = set(demand_df["item_code"]) - schedule_item_codes
         if missing_schedule:
-            raise ValueError(f"物料 {sorted(missing_schedule)[0]} 在排产信息中不存在")
+            logger.error(f"物料 {sorted(missing_schedule)} 在排产信息中不存在")
+            raise ValueError(f"物料 {sorted(missing_schedule)} 在排产信息中不存在")
 
         missing_packaging = set(demand_df["item_code"]) - set(self.pc_per_pallet)
         if missing_packaging:
-            raise ValueError(f"物料 {sorted(missing_packaging)[0]} 缺少包规")
+            logger.error(f"物料 {sorted(missing_packaging)} 缺少包规")
+            raise ValueError(f"物料 {sorted(missing_packaging)} 缺少包规")
 
         missing_supplier = set(demand_df["supplier"]) - set(supplier_info)
         if missing_supplier:
-            raise ValueError(f"供应商 {sorted(missing_supplier)[0]} 缺少车规")
+            logger.error(f"供应商 {sorted(missing_supplier)} 缺少车规")
+            raise ValueError(f"供应商 {sorted(missing_supplier)} 缺少车规")
 
         for d_row in demand_df.itertuples(index=False):
             self.s_to_i_set[d_row.supplier].add(d_row.item_code)
