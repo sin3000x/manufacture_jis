@@ -4,10 +4,40 @@ from collections.abc import Sequence
 from pathlib import Path
 import unicodedata
 
+from loguru import logger
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Font
 from openpyxl.worksheet.worksheet import Worksheet
+
+
+def build_sheet_name_map(path) -> dict[str, str]:
+    """strip 后的名称 -> Excel 中的实际 sheet 名（兼容首尾空格）。"""
+    with pd.ExcelFile(path) as xl:
+        return {name.strip(): name for name in xl.sheet_names}
+
+
+def read_sheet(
+    path,
+    sheet_name: str,
+    col_map: dict[str, str],
+    sheet_map: dict[str, str],
+    fillna_map: dict[str, object] | None = None,
+) -> pd.DataFrame:
+    actual = sheet_map.get(sheet_name.strip())
+    if actual is None:
+        logger.error(f"工作表 '{sheet_name}' 不存在，可用: {list(sheet_map)}")
+        raise ValueError(f"工作表 '{sheet_name}' 不存在，可用: {list(sheet_map)}")
+    df = pd.read_excel(path, sheet_name=actual)
+    if df.empty:
+        return df
+    available = {k: v for k, v in col_map.items() if k in df.columns}
+    df = df.rename(columns=available)[list(available.values())]
+    if fillna_map:
+        df = df.fillna({k: v for k, v in fillna_map.items() if k in df.columns})
+    df = df.dropna()
+    logger.info(f"读取 {sheet_name} 表，行数: {len(df)}")
+    return df.reset_index(drop=True)
 
 
 def write_df_to_excel(

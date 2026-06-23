@@ -9,6 +9,7 @@ from loguru import logger
 import pandas as pd
 
 from manufacture_jis.base import Concumption, Vehicle
+from manufacture_jis.excel_utils import build_sheet_name_map, read_sheet
 
 SCHEDULE_COL_MAP = {
     "线体": "line",
@@ -38,34 +39,6 @@ SUPPLIER_COL_MAP = {
     "车规（板/车）": "vehicle_capacity",
 }
 
-
-def _build_sheet_name_map(path) -> dict[str, str]:
-    """strip 后的名称 -> Excel 中的实际 sheet 名（兼容首尾空格）。"""
-    with pd.ExcelFile(path) as xl:
-        return {name.strip(): name for name in xl.sheet_names}
-
-
-def _read_sheet(
-    path,
-    sheet_name: str,
-    col_map: dict[str, str],
-    sheet_map: dict[str, str],
-    fillna_map: dict[str, object] | None = None,
-) -> pd.DataFrame:
-    actual = sheet_map.get(sheet_name.strip())
-    if actual is None:
-        logger.error(f"工作表 '{sheet_name}' 不存在，可用: {list(sheet_map)}")
-        raise ValueError(f"工作表 '{sheet_name}' 不存在，可用: {list(sheet_map)}")
-    df = pd.read_excel(path, sheet_name=actual)
-    if df.empty:
-        return df
-    available = {k: v for k, v in col_map.items() if k in df.columns}
-    df = df.rename(columns=available)[list(available.values())]
-    if fillna_map:
-        df = df.fillna({k: v for k, v in fillna_map.items() if k in df.columns})
-    df = df.dropna()
-    logger.info(f"读取 {sheet_name} 表，行数: {len(df)}")
-    return df.reset_index(drop=True)
 
 
 class JISData:
@@ -133,7 +106,7 @@ class JISData:
         # 物料编码 -> 货位
         self.item_to_location: dict[str, str] = {}
 
-        self._sheet_map: dict[str, str] = _build_sheet_name_map(path)
+        self._sheet_map: dict[str, str] = build_sheet_name_map(path)
 
         self._load()
 
@@ -203,7 +176,7 @@ class JISData:
         self._populate_vehicle_mappings()
 
     def _load_packaging(self) -> None:
-        df = _read_sheet(
+        df = read_sheet(
             self.path, self.PACKING_SHEET, PACKING_COL_MAP, self._sheet_map
         )
         if df.empty:
@@ -215,7 +188,7 @@ class JISData:
             self.item_set.add(row.item_code)
 
     def _read_supplier_info(self) -> dict[str, int]:
-        df = _read_sheet(
+        df = read_sheet(
             self.path, self.SUPPLIER_SHEET, SUPPLIER_COL_MAP, self._sheet_map
         )
         info: dict[str, int] = {}
@@ -240,7 +213,7 @@ class JISData:
                 self.s_to_v_set[supplier].add(vid)
 
     def _load_schedule(self) -> pd.DataFrame:
-        df = _read_sheet(
+        df = read_sheet(
             self.path, self.SCHEDULE_SHEET, SCHEDULE_COL_MAP, self._sheet_map,
             fillna_map={"rest_time": 0},
         )
@@ -256,7 +229,7 @@ class JISData:
         return df
 
     def _load_demands(self) -> pd.DataFrame:
-        df = _read_sheet(self.path, self.DEMAND_SHEET, DEMAND_COL_MAP, self._sheet_map)
+        df = read_sheet(self.path, self.DEMAND_SHEET, DEMAND_COL_MAP, self._sheet_map)
         if df.empty:
             return df
         df["demand_id"] = df["demand_id"].astype(str).str.strip()
