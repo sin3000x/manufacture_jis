@@ -344,6 +344,12 @@ class JISData:
             processing_time: int = math.ceil(
                 s_row.finish_hour - s_row.start_hour - s_row.rest_time
             )
+
+            # 把 0 改成 1，兜底很短的时间
+            if processing_time <= 0:
+                processing_time = 1
+            logger.warning(f"任务令 {s_row.mfg_order} 加工时间 {processing_time} 小时，小于 1 小时，已改为 1 小时")
+
             # 每小时均分的基础量和余数（余数分配到最后一小时）
             base_qty: int = s_row.planned_qty // processing_time
             remainder: int = s_row.planned_qty % processing_time
